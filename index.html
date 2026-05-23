@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v18</title>
+<title>1人管理用シフト生成アプリ v19</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -44,10 +44,79 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 .staffBtn .detailText{position:absolute;right:14px;top:44px;min-width:82px;justify-content:center}
 .staffBtn .orderBtns{justify-content:flex-start!important;width:auto!important}
 .staffBtn .moveBtns{display:flex;gap:6px}
+
+/* v19 staff layout overrides */
+.staffBtn{
+  position:relative!important;
+  min-height:112px!important;
+  padding:16px 132px 16px 16px!important;
+}
+.staffBtn .staffNameLine{
+  display:block!important;
+}
+.staffBtn .detailText{
+  position:absolute!important;
+  right:16px!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  min-width:88px!important;
+  height:48px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0 12px!important;
+}
+.staffBtn .orderBtns{
+  display:flex!important;
+  justify-content:flex-start!important;
+  width:auto!important;
+  margin-top:16px!important;
+}
+.staffBtn .moveBtns{
+  display:flex!important;
+  gap:8px!important;
+}
+.eventBox{
+  display:grid!important;
+  grid-template-columns:34px minmax(82px,1fr)!important;
+  gap:2px!important;
+  width:100%!important;
+  align-items:center!important;
+}
+.eventTime{
+  width:34px!important;
+  min-width:34px!important;
+  padding:4px 0!important;
+  font-size:9px!important;
+}
+.eventMemo{
+  width:100%!important;
+  min-width:82px!important;
+  padding:4px 2px!important;
+  font-size:11px!important;
+}
+.detailFormV19{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.detailFormV19 .wide{grid-column:1/-1}
+.detailFormV19 label{
+  font-size:11px;
+  color:var(--m);
+  font-weight:800;
+}
+.detailFormV19 input,.detailFormV19 select{width:100%}
+@media(max-width:700px){
+  .detailFormV19{grid-template-columns:1fr 1fr}
+  .staffBtn{padding-right:126px!important}
+  .staffBtn .detailText{right:14px!important;min-width:82px!important}
+}
+
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v18</h1><div class="sub">スタッフ詳細配置・詳細画面並び最終調整版</div></header>
+<header><h1>1人管理用シフト生成アプリ v19</h1><div class="sub">スタッフ設定レイアウト確実反映版</div></header>
 
 <main>
 <section class="card">
@@ -118,7 +187,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v18_single_manager';
+const storeKey='shift_v19_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -420,7 +489,18 @@ function renderStaff(){
   staffHall.className=staffView==='ホール'?'on':'sec';
   staffKitchen.className=staffView==='調理場'?'on':'sec';
   let list=staff.filter(s=>s.role===staffView);
-  staffList.innerHTML=list.length?list.map(s=>`<button class="staffBtn" onclick="openDetail('${s.id}')"><strong>${s.name}</strong><div class="meta">${s.employment} / ${s.role} / ${s.bs}:00〜${s.be}:00</div><button class="sec detailText" onclick="event.stopPropagation();openDetail('${s.id}')">詳細 ›</button><div class="orderBtns" onclick="event.stopPropagation()"><span class="moveBtns"><button class="sec" onclick="moveStaff('${s.id}',-1)">↑</button><button class="sec" onclick="moveStaff('${s.id}',1)">↓</button></span></div></button>`).join(''):'<p class="note">このページのスタッフはいません。</p>';
+  staffList.innerHTML=list.length?list.map(s=>`
+    <button class="staffBtn" onclick="openDetail('${s.id}')">
+      <span class="staffNameLine"><strong>${s.name}</strong></span>
+      <div class="meta">${s.employment||s.rank||''} / ${s.role} / ${s.bs}:00〜${s.be}:00</div>
+      <button class="sec detailText" onclick="event.stopPropagation();openDetail('${s.id}')">詳細 ›</button>
+      <div class="orderBtns" onclick="event.stopPropagation()">
+        <span class="moveBtns">
+          <button class="sec" onclick="moveStaff('${s.id}',-1)">↑</button>
+          <button class="sec" onclick="moveStaff('${s.id}',1)">↓</button>
+        </span>
+      </div>
+    </button>`).join(''):'<p class="note">このページのスタッフはいません。</p>';
 }
 function moveStaff(id,dir){
   let indexes=staff.map((s,i)=>({s,i})).filter(x=>x.s.role===staffView);
@@ -433,21 +513,81 @@ function moveStaff(id,dir){
   quickSave(); renderAll(); renderStaff();
 }
 function openDetail(id){
-  editing=id; let s=staff.find(x=>x.id===id);
+  editing=id; 
+  let s=staff.find(x=>x.id===id);
   if(s.os===undefined) s.os='';
   if(s.oe===undefined) s.oe='';
   if(s.weekend===undefined) s.weekend=true;
+  if(s.employment===undefined) s.employment = s.rank==='社員' ? '社員' : 'バイト';
   detailTitle.textContent=s.name+' 詳細';
-  detailBody.innerHTML=`<div class="form">
-    <div class="fieldWide"><label>スタッフ名</label><input value="${s.name}" onchange="setStaff('name',this.value)"></div>
-    <div><label>雇用形態</label><select onchange="setStaff('employment',this.value)"><option ${s.employment==='社員'?'selected':''}>社員</option><option ${s.employment==='バイト'?'selected':''}>バイト</option></select></div>
-    <div><label>役割</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
-    <div><label>入力型</label><select onchange="setStaff('input',this.value)"><option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option><option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option></select></div>
-    <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
-    <div class="fieldWide"><label>メイン時間</label><div class="timeRange"><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div></div>
-    <div class="fieldWide"><label>その他時間</label><div class="timeRange"><select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select></div></div>
-    <div class="fieldWide"><label>ランク</label><select onchange="setStaff('rank',this.value)"><option value="" ${!s.rank?'selected':''}>未設定</option><option ${s.rank==='A'?'selected':''}>A</option><option ${s.rank==='B'?'selected':''}>B</option><option ${s.rank==='C'?'selected':''}>C</option><option ${s.rank==='D'?'selected':''}>D</option><option ${s.rank==='E'?'selected':''}>E</option></select></div>
+  detailBody.innerHTML=`
+  <div class="detailFormV19">
+    <div class="wide">
+      <label>スタッフ名</label>
+      <input value="${s.name}" onchange="setStaff('name',this.value)">
+    </div>
+
+    <div>
+      <label>雇用形態</label>
+      <select onchange="setStaff('employment',this.value)">
+        <option ${s.employment==='社員'?'selected':''}>社員</option>
+        <option ${s.employment==='バイト'?'selected':''}>バイト</option>
+      </select>
+    </div>
+    <div>
+      <label>役割</label>
+      <select onchange="setStaff('role',this.value)">
+        <option ${s.role==='ホール'?'selected':''}>ホール</option>
+        <option ${s.role==='調理場'?'selected':''}>調理場</option>
+      </select>
+    </div>
+
+    <div>
+      <label>入力型</label>
+      <select onchange="setStaff('input',this.value)">
+        <option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option>
+        <option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option>
+      </select>
+    </div>
+    <div>
+      <label>土日出勤</label>
+      <select onchange="setStaff('weekend',this.value==='true')">
+        <option value="true" ${s.weekend!==false?'selected':''}>可</option>
+        <option value="false" ${s.weekend===false?'selected':''}>不可</option>
+      </select>
+    </div>
+
+    <div class="wide">
+      <label>メイン時間</label>
+      <div class="timeRange">
+        <select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select>
+        <span>〜</span>
+        <select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select>
+      </div>
+    </div>
+
+    <div class="wide">
+      <label>その他時間</label>
+      <div class="timeRange">
+        <select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select>
+        <span>〜</span>
+        <select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select>
+      </div>
+    </div>
+
+    <div class="wide">
+      <label>ランク</label>
+      <select onchange="setStaff('rank',this.value)">
+        <option value="" ${!s.rank?'selected':''}>未設定</option>
+        <option ${s.rank==='A'?'selected':''}>A</option>
+        <option ${s.rank==='B'?'selected':''}>B</option>
+        <option ${s.rank==='C'?'selected':''}>C</option>
+        <option ${s.rank==='D'?'selected':''}>D</option>
+        <option ${s.rank==='E'?'selected':''}>E</option>
+      </select>
+    </div>
   </div>
+
   <div class="skillGroup" style="margin-top:12px">
     <label><input type="checkbox" ${s.skills?.includes('セッティング')?'checked':''} onchange="toggleSkill('セッティング',this.checked)"> セッティング</label>
     <label><input type="checkbox" ${s.skills?.includes('レジ締め')?'checked':''} onchange="toggleSkill('レジ締め',this.checked)"> レジ締め</label>
@@ -458,7 +598,11 @@ function openDetail(id){
     <label><input type="checkbox" ${s.skills?.includes('鉄板')?'checked':''} onchange="toggleSkill('鉄板',this.checked)"> 鉄板</label>
     <label><input type="checkbox" ${s.skills?.includes('新人')?'checked':''} onchange="toggleSkill('新人',this.checked)"> 新人</label>
   </div>
-  <div class="row" style="margin-top:12px"><button class="sec" onclick="closeDetail()">戻る</button><button class="danger" onclick="deleteStaff('${s.id}')">削除</button></div>`;
+
+  <div class="row" style="margin-top:12px">
+    <button class="sec" onclick="closeDetail()">戻る</button>
+    <button class="danger" onclick="deleteStaff('${s.id}')">削除</button>
+  </div>`;
   detailModal.classList.remove('hide');
 }
 function timeOpts(cur,a,b){let out='';for(let h=a;h<=b;h++)out+=`<option value="${h}" ${Number(cur)===h?'selected':''}>${h}:00</option>`;return out}
