@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v12</title>
+<title>1人管理用シフト生成アプリ v13</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -29,11 +29,11 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 .badge{background:var(--s);color:var(--a);font-weight:800;border-radius:999px;padding:8px 12px;white-space:nowrap}.item{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--l);border-radius:14px;background:#fff;padding:10px;margin:7px 0}
 .grid{display:grid;grid-template-columns:1fr;gap:8px}.box,.grid>div{background:white;border:1px solid var(--l);border-radius:14px;padding:10px}.grid b{font-size:18px;display:block}
 .staffBtn{width:100%;text-align:left;background:#fff;color:var(--t);border:1px solid var(--l);box-shadow:none;margin:6px 0}.meta{font-size:12px;color:var(--m);margin-top:3px}.pill{display:inline-block;background:var(--s);color:var(--a);border-radius:999px;padding:3px 7px;margin:2px;font-size:11px}
-.orderBtns{display:flex;gap:6px;margin-top:8px;align-items:center}.orderBtns button{padding:6px 9px;font-size:12px}
+.orderBtns{display:flex;gap:6px;margin-top:8px;align-items:center;justify-content:space-between}.detailText{margin-left:auto;color:var(--a);font-weight:800}.moveBtns{display:flex;gap:6px}.orderBtns button{padding:6px 9px;font-size:12px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form label{font-size:11px;color:var(--m);font-weight:800}.form input,.form select{width:100%}
 .skillGroup{display:grid;grid-template-columns:1fr 1fr;gap:6px}.skillGroup label{background:var(--s);border-radius:12px;padding:8px;font-size:13px}
 .empCard{grid-column:1/-1;max-width:100%;overflow:hidden}.empHead{display:flex;justify-content:space-between;gap:8px;align-items:center}.weeks{display:flex;gap:8px;overflow:auto;padding-top:8px;-webkit-overflow-scrolling:touch}.week{min-width:118px;background:#f7fbfb;border:1px solid var(--l);border-radius:12px;padding:8px}.week input{width:72px;padding:6px}
-.eventInput{width:72px;padding:4px 3px;font-size:11px;border-radius:8px;text-align:center;background:#fff}.eventHead{background:#f8ffff!important}
+.eventBox{display:flex;gap:3px;justify-content:center;align-items:center}.eventTime{width:48px;padding:4px 1px;font-size:10px;border-radius:8px}.eventMemo{width:54px;padding:4px 3px;font-size:11px;border-radius:8px;text-align:center;background:#fff}.eventHead{background:#f8ffff!important}
 .modal{position:fixed;inset:0;background:#1238;z-index:20;display:flex;align-items:center;justify-content:center;padding:8px}.inner{background:white;width:min(1100px,100%);max-height:92vh;overflow:auto;border-radius:18px;padding:14px}.mh{position:sticky;top:0;background:white;border-bottom:1px solid var(--l);padding-bottom:8px;display:flex;justify-content:space-between;gap:8px}
 .print{width:1120px;margin:auto}.miniTitle{font-size:10px;text-align:left;margin:0 0 2px;color:#333}.pt{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed}.pt th,.pt td{border:1px solid #777;padding:3px 1px;position:static!important;background:white!important}.pt th:first-child,.pt td:first-child{display:table-cell!important;width:58px}
 @media(max-width:700px){.form,.seg{grid-template-columns:1fr}.empHead{align-items:flex-start}.card{padding:12px}}
@@ -42,7 +42,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v12</h1><div class="sub">安定版・並び順変更・イベント欄・スキル並び修正</div></header>
+<header><h1>1人管理用シフト生成アプリ v13</h1><div class="sub">レイアウト最終調整・イベント時間/メモ対応</div></header>
 
 <main>
 <section class="card">
@@ -56,7 +56,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
     <button class="sec" onclick="saveData()">保存</button>
     <button class="sec" onclick="resetData()">初期化</button>
   </div>
-  <p class="note">v11で不安定になったため、安定版をベースに作り直しました。</p>
+  <p class="note">レイアウト最終調整版です。次は自動生成ルールを細かく詰めます。</p>
 </section>
 
 <section id="pInput" class="card">
@@ -113,7 +113,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v12_single_manager';
+const storeKey='shift_v13_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,half:false,close:false,set:false,max:5},
@@ -184,13 +184,19 @@ function showPanel(name){
   if(name==='Hours') renderHours();
   if(name==='Staff') renderStaff();
 }
-function getEvent(k){return events[k]||''}
-function setEvent(k,v){events[k]=v;quickSave();renderAll()}
+function eventObj(k){
+  if(typeof events[k]==='string') events[k]={time:'',memo:events[k]};
+  events[k]??={time:'',memo:''};
+  return events[k];
+}
+function setEventTime(k,v){eventObj(k).time=v;quickSave();renderAll()}
+function setEventMemo(k,v){eventObj(k).memo=String(v||'').slice(0,5);quickSave();renderAll()}
 function esc(s){return String(s||'').replace(/"/g,'&quot;')}
 function eventRowHtml(){
+  let opts=['','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23'];
   return '<tr><th class="eventHead">イベント</th>'+dates.map(d=>{
-    let k=ymd(d);
-    return `<th class="eventHead"><input class="eventInput" value="${esc(getEvent(k))}" placeholder="メモ" onchange="setEvent('${k}',this.value)"></th>`;
+    let k=ymd(d), ev=eventObj(k);
+    return `<th class="eventHead"><div class="eventBox"><select class="eventTime" onchange="setEventTime('${k}',this.value)">${opts.map(o=>`<option value="${o}" ${String(ev.time)===String(o)?'selected':''}>${o?o+'時':'なし'}</option>`).join('')}</select><input class="eventMemo" maxlength="5" value="${esc(ev.memo)}" placeholder="メモ" onchange="setEventMemo('${k}',this.value)"></div></th>`;
   }).join('')+'</tr>';
 }
 function reqObj(id,k){requests[id]??={};requests[id][k]??={m:'',h:'17',d:'from'};return requests[id][k]}
@@ -354,7 +360,7 @@ function renderStaff(){
   staffHall.className=staffView==='ホール'?'on':'sec';
   staffKitchen.className=staffView==='調理場'?'on':'sec';
   let list=staff.filter(s=>s.role===staffView);
-  staffList.innerHTML=list.length?list.map(s=>`<button class="staffBtn" onclick="openDetail('${s.id}')"><strong>${s.name}</strong><div class="meta">${s.employment} / ${s.role} / ${s.bs}:00〜${s.be}:00</div><div class="orderBtns" onclick="event.stopPropagation()"><button class="sec" onclick="moveStaff('${s.id}',-1)">↑</button><button class="sec" onclick="moveStaff('${s.id}',1)">↓</button><span class="note">詳細 ›</span></div></button>`).join(''):'<p class="note">このページのスタッフはいません。</p>';
+  staffList.innerHTML=list.length?list.map(s=>`<button class="staffBtn" onclick="openDetail('${s.id}')"><strong>${s.name}</strong><div class="meta">${s.employment} / ${s.role} / ${s.bs}:00〜${s.be}:00</div><div class="orderBtns" onclick="event.stopPropagation()"><span class="moveBtns"><button class="sec" onclick="moveStaff('${s.id}',-1)">↑</button><button class="sec" onclick="moveStaff('${s.id}',1)">↓</button></span><span class="detailText" onclick="openDetail('${s.id}')">詳細 ›</span></div></button>`).join(''):'<p class="note">このページのスタッフはいません。</p>';
 }
 function moveStaff(id,dir){
   let indexes=staff.map((s,i)=>({s,i})).filter(x=>x.s.role===staffView);
