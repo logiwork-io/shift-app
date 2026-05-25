@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v33</title>
+<title>1人管理用シフト生成アプリ v34</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -202,7 +202,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v33</h1><div class="sub">自動生成復旧・締め3人対応版</div></header>
+<header><h1>1人管理用シフト生成アプリ v34</h1><div class="sub">偏り軽減・セッティング早上がり・社員月8休固定版</div></header>
 
 <main>
 <section class="card">
@@ -277,7 +277,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v33_single_manager';
+const storeKey='shift_v34_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -298,8 +298,8 @@ let staff=[
 ];
 let dates=[],requests={},schedule={},actual={},events={},view={input:'ホール',month:'ホール',day:'ホール'},staffView='ホール',editing=null;
 const H=[9,10,11,12,13,14,15,16,17,18,19], skills=['セッティング','レジ締め','ドリバ','ドリバ締め','仕込み','串打ち','鉄板','新人'];
-const patWeek=[['9',9,17],['9',9,18],['11',11,15],['11',11,17],['11',11,18],['11',11,20],['13',13,17],['13',13,20],['13',13,22],['15',15,20],['15',15,22],['17',17,20],['17',17,22],['18',18,22]];
-const patEnd=[['9',9,17],['9',9,18],['11',11,15],['11',11,18],['11',11,20],['13',13,18],['13',13,20],['15',15,20],['15',15,23],['17',17,20],['17',17,23],['18',18,23]];
+const patWeek=[['9',9,13],['9',9,15],['9',9,17],['9',9,18],['11',11,15],['11',11,17],['11',11,18],['11',11,20],['13',13,17],['13',13,20],['13',13,22],['15',15,20],['15',15,22],['17',17,20],['17',17,22],['18',18,22]];
+const patEnd=[['9',9,13],['9',9,15],['9',9,17],['9',9,18],['11',11,15],['11',11,18],['11',11,20],['13',13,18],['13',13,20],['15',15,20],['15',15,23],['17',17,20],['17',17,23],['18',18,23]];
 const ymd=d=>d.toISOString().slice(0,10);
 const wd=d=>'日月火水木金土'[d.getDay()];
 const isWeekend=d=>d.getDay()===0||d.getDay()===6;
@@ -561,8 +561,7 @@ function employeeHardLimitOk(s,p,idx){
   if(patternDuration(p)>9) return false;
   if(patternDuration(p)<7) return false;
   if(weekScheduledHoursFor(s.id,idx)+h>40) return false;
-  let maxWorkDays=Math.max(0,dates.length-8);
-  if(!schedule[ymd(dates[idx])]?.[s.id] && monthScheduledDaysFor(s.id)+1>maxWorkDays) return false;
+  if(!employeeMonthlyRestOkIfAdd(s,idx)) return false;
   if(monthScheduledHoursFor(s.id)+h>203) return false;
   return true;
 }
@@ -590,12 +589,48 @@ function midRankRestScore(s){
   // 飽和時は真ん中評価を休ませやすくする。Cが一番休み候補、B/Dが次、A/Eは残しやすい。
   return ({A:0,B:45,C:80,D:45,E:0}[s.rank]||40);
 }
+
+function monthlyWorkDaysFor(id,idxLimit=null){
+  let end = idxLimit===null ? dates.length : idxLimit;
+  let c=0;
+  for(let i=0;i<end;i++){
+    if(schedule[ymd(dates[i])]?.[id]) c++;
+  }
+  return c;
+}
+function plannedHoursFor(id,idxLimit=null){
+  let end = idxLimit===null ? dates.length : idxLimit;
+  let sum=0;
+  for(let i=0;i<end;i++){
+    sum+=hoursOfShift(schedule[ymd(dates[i])]?.[id]);
+  }
+  return sum;
+}
+function fairnessBonus(s,idx){
+  // 全体的に満遍なく入れる。今月ここまでの出勤日数・時間が少ない人を少し優先。
+  let sameRole=staff.filter(x=>x.role===s.role && x.employment===s.employment);
+  if(!sameRole.length) return 0;
+  let ownDays=monthlyWorkDaysFor(s.id,idx);
+  let minDays=Math.min(...sameRole.map(x=>monthlyWorkDaysFor(x.id,idx)));
+  let ownHours=plannedHoursFor(s.id,idx);
+  let minHours=Math.min(...sameRole.map(x=>plannedHoursFor(x.id,idx)));
+  return Math.max(0,(minDays+1-ownDays))*8 + Math.max(0,(minHours+6-ownHours))*0.8;
+}
+function employeeMonthlyRestOkIfAdd(s,idx){
+  if(s.employment!=='社員') return true;
+  let maxWorkDays=Math.max(0,dates.length-8); // 月8休ちょうどにするため最大出勤数
+  let already = monthlyWorkDaysFor(s.id);
+  let todayKey=ymd(dates[idx]);
+  let alreadyToday=!!schedule[todayKey]?.[s.id];
+  return alreadyToday || already < maxWorkDays;
+}
+
 function slotSelectScore(s,idx){
   let prevStreak=streak(s.id,idx);
-  if(prevStreak>=4) return -9999; // 6連勤に近い人は入れない方向
-  let scarce=scarceScore(s)*12;   // 出勤可能日が少ない人を最優先で守る
+  if(prevStreak>=4) return -9999;
+  let scarce=scarceScore(s)*12;
   let rankKeep=({A:70,B:45,C:15,D:35,E:25}[s.rank]||20);
-  return scarce + rankKeep + employeeBalanceBonus(s,idx)
+  return scarce + rankKeep + fairnessBonus(s,idx) + employeeBalanceBonus(s,idx)
     + (s.employment==='社員'?8:0)
     + (s.skills?.includes('レジ締め')?4:0)
     + (s.skills?.includes('ドリバ締め')?4:0)
@@ -646,12 +681,15 @@ function turnoverPatternScore(p,d,s,n){
   let nextHead=nextSlotHeadAfter(d,p[1]);
   let earlyLeave=0;
   if(s.employment!=='社員'){
+    if(p[1]===9 && p[2]===13) earlyLeave+=90;
+    else if(p[1]===9 && p[2]===15) earlyLeave+=75;
+    else if(p[1]===9 && p[2]<=17) earlyLeave+=35;
     if(p[2]===nextHead) earlyLeave+=35;
     else if(heads.includes(p[2])) earlyLeave+=22;
     else if(p[2]-p[1]<=5) earlyLeave+=18;
   }
-  if(n[4]==='ラスト' && p[2]>=closeHour(d)) earlyLeave+=30;
-  let lengthPenalty=Math.max(0,(p[2]-p[1]-6))*4;
+  if(n[4]==='ラスト' && p[2]>=closeHour(d)) earlyLeave+=35;
+  let lengthPenalty=Math.max(0,(p[2]-p[1]-6))*5;
   return startsAtHead + earlyLeave - lengthPenalty;
 }
 function canRemoveWithoutBreaking(k,d,poolAll,id){
@@ -730,7 +768,9 @@ function hasClosingSkillAt(k,skill,close){
   return staff.some(s=>s.skills?.includes(skill) && schedule[k]?.[s.id]?.end>=close);
 }
 function ensureClosingStaff(k,idx,d,used,poolAll,skill){
-  let close=closeHour(d);
+  let setupOk=staff.some(s=>s.role==='ホール'&&(s.set||s.skills?.includes('セッティング'))&&dayObj[s.id]?.start<=9&&dayObj[s.id]?.end>=11);
+    if(!setupOk) w.push(`${label}：9時〜11時のセッティング担当がいません`);
+    let close=closeHour(d);
   if(hasClosingSkillAt(k,skill,close)) return true;
   let candidates=[];
   for(let s of poolAll){
@@ -870,6 +910,11 @@ function autoMake(role){
         .sort((a,b)=>score(b)-score(a));
       for(let s of setupCandidates){
         let ps=patterns(s,d).filter(p=>allowed(s,d,p)&&coversSlot(p,setupSlot)&&employeeHardLimitOk(s,p,idx));
+        ps.sort((a,b)=>{
+          let prefA=(a[1]===9&&a[2]===13)?100:(a[1]===9&&a[2]===15)?80:(a[1]===9&&a[2]===17)?30:0;
+          let prefB=(b[1]===9&&b[2]===13)?100:(b[1]===9&&b[2]===15)?80:(b[1]===9&&b[2]===17)?30:0;
+          return prefB-prefA || a[2]-b[2];
+        });
         if(ps.length && assignPattern(k,idx,d,used,s,ps[0])) break;
       }
     }
@@ -1033,7 +1078,7 @@ function renderWarnings(){
 
   staff.filter(s=>s.employment==='社員').forEach(s=>{
     let workDays=monthScheduledDaysFor(s.id);
-    if(dates.length-workDays<8) w.push(`${s.name}：社員の月休みが8日未満です`);
+    if(dates.length-workDays!==8) w.push(`${s.name}：社員の月休みが8日ちょうどではありません（休み${dates.length-workDays}日）`);
     dates.forEach((d,idx)=>{
       if(weekScheduledHoursFor(s.id,idx)>40) w.push(`${s.name}：週40時間を超えています`);
     });
@@ -1103,7 +1148,7 @@ function openDetail(id){
   detailModal.classList.remove('hide');
 }
 function timeOpts(cur,a,b){let out='';for(let h=a;h<=b;h++)out+=`<option value="${h}" ${Number(cur)===h?'selected':''}>${h}:00</option>`;return out}
-function timeOptsWithNone(cur,a,b){let out=`<option value="" ${cur===''||cur===undefined?'selected':''}>なし</option>`;for(let h=a;h<=b;h++)out+=`<option value="${h}" ${String(cur)===String(h)?'selected':''}>${h}:00</option>`;return out}
+function timeOptsWithNone(cur,a,b){let out=`<option value="" ${cur===''||cur===undefined?'selected':''}>フリー</option>`;for(let h=a;h<=b;h++)out+=`<option value="${h}" ${String(cur)===String(h)?'selected':''}>${h}:00</option>`;return out}
 function setStaff(key,val){let s=staff.find(x=>x.id===editing);s[key]=val;quickSave();openDetail(editing);renderAll();renderStaff()}
 function toggleSkill(skill,on){
   let s=staff.find(x=>x.id===editing);s.skills??=[];
