@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v34</title>
+<title>1人管理用シフト生成アプリ v36</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -202,7 +202,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v34</h1><div class="sub">偏り軽減・セッティング早上がり・社員月8休固定版</div></header>
+<header><h1>1人管理用シフト生成アプリ v36</h1><div class="sub">反映確認修正版・社員月8休み補正強化版</div></header>
 
 <main>
 <section class="card">
@@ -277,7 +277,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v34_single_manager';
+const storeKey='shift_v36_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -510,9 +510,15 @@ function needs(d){
   return [[9,11,1,1,'セッティング'],[11,13,3,4,'昼立ち上げ'],[13,15,3,4,'昼ピーク'],[15,17,3,4,'午後'],[17,20,4,5,'夜ピーク'],[20,22,3,4,'ラスト']];
 }
 function covers(p,n){return p[1]<n[1]&&p[2]>n[0]}
-function val(s){return s.half?0.5:1}
+function strengthVal(s){
+  let base=({A:1.25,B:1,C:0.75,D:0.5,E:0.25}[s.rank]||1);
+  return base;
+}
+function val(s){return strengthVal(s)}
+function isWeakStaff(s){return !!(s.skills?.includes('新人') || ['D','E'].includes(s.rank))}
+function isStrongStaff(s){return strengthVal(s)>=1}
 function streak(id,idx){let c=0;for(let i=idx-1;i>=0;i--){let k=ymd(dates[i]);if(schedule[k]?.[id])c++;else break}return c}
-function rankScore(s){return ({A:50,B:40,C:30,D:20,E:10}[s.rank]||0)}
+function rankScore(s){return ({A:24,B:18,C:12,D:8,E:5}[s.rank]||10)}
 function availabilityCount(s){
   return dates.reduce((n,d)=>{
     let r=reqObj(s.id,ymd(d));
@@ -618,24 +624,37 @@ function fairnessBonus(s,idx){
 }
 function employeeMonthlyRestOkIfAdd(s,idx){
   if(s.employment!=='社員') return true;
-  let maxWorkDays=Math.max(0,dates.length-8); // 月8休ちょうどにするため最大出勤数
+  let maxWorkDays=targetEmployeeWorkDays(); // 月8休ちょうどにするため最大出勤数
   let already = monthlyWorkDaysFor(s.id);
   let todayKey=ymd(dates[idx]);
   let alreadyToday=!!schedule[todayKey]?.[s.id];
   return alreadyToday || already < maxWorkDays;
+}
+function employeeMustWorkToday(s,idx){
+  if(s.employment!=='社員') return false;
+  let targetWorkDays=targetEmployeeWorkDays();
+  let worked=monthlyWorkDaysFor(s.id,idx);
+  let remainingDays=dates.length-idx;
+  let remainingNeed=targetWorkDays-worked;
+  return remainingNeed>=remainingDays;
+}
+function employeeNeedPressureBonus(s,idx){
+  if(s.employment!=='社員') return 0;
+  return employeeMustWorkToday(s,idx) ? 220 : 0;
 }
 
 function slotSelectScore(s,idx){
   let prevStreak=streak(s.id,idx);
   if(prevStreak>=4) return -9999;
   let scarce=scarceScore(s)*12;
-  let rankKeep=({A:70,B:45,C:15,D:35,E:25}[s.rank]||20);
-  return scarce + rankKeep + fairnessBonus(s,idx) + employeeBalanceBonus(s,idx)
+  let strengthKeep=rankScore(s);
+  let weakAdjust=isWeakStaff(s)?6:0;
+  return scarce + strengthKeep + weakAdjust + fairnessBonus(s,idx) + employeeBalanceBonus(s,idx) + employeeNeedPressureBonus(s,idx)
     + (s.employment==='社員'?8:0)
     + (s.skills?.includes('レジ締め')?4:0)
     + (s.skills?.includes('ドリバ締め')?4:0)
     + (s.skills?.includes('セッティング')?3:0)
-    - (s.skills?.includes('新人')?2:0);
+    - (s.skills?.includes('新人')?1:0);
 }
 function assignScoped(k,idx,d,used,s,labels=[]){
   if(used.has(s.id)||streak(s.id,idx)>=Number(s.max||5)) return false;
@@ -720,6 +739,23 @@ function rotateEarlyLeavers(k,d,poolAll){
   }
 }
 
+
+function slotAssignedStaff(k,n,poolAll){
+  let ids=new Set(poolAll.map(s=>s.id));
+  return Object.entries(schedule[k]||{})
+    .filter(([id,p])=>ids.has(id) && p.start<n[1] && p.end>n[0])
+    .map(([id])=>staff.find(x=>x.id===id))
+    .filter(Boolean);
+}
+function slotHasStrong(k,n,poolAll){
+  return slotAssignedStaff(k,n,poolAll).some(s=>isStrongStaff(s));
+}
+function slotHasWeak(k,n,poolAll){
+  return slotAssignedStaff(k,n,poolAll).some(s=>isWeakStaff(s));
+}
+function patternSetForSlot(s,d,useOther){
+  return (useOther?otherPatterns(s,d):mainPatterns(s,d));
+}
 function chooseBestForSlot(k,idx,d,used,poolAll,n){
   function collect(useOther){
     let candidates=[];
@@ -727,16 +763,23 @@ function chooseBestForSlot(k,idx,d,used,poolAll,n){
       if(used.has(s.id)) continue;
       let select=slotSelectScore(s,idx);
       if(select<=-9999) continue;
-      let ps=(useOther?otherPatterns(s,d):mainPatterns(s,d)).filter(p=>allowed(s,d,p)&&coversSlot(p,n)&&employeeHardLimitOk(s,p,idx));
+      let ps=patternSetForSlot(s,d,useOther).filter(p=>allowed(s,d,p)&&coversSlot(p,n)&&employeeHardLimitOk(s,p,idx));
       for(let p of ps){
         let tScore=turnoverPatternScore(p,d,s,n);
-        candidates.push({s,p,score:select + tScore + (useOther?-120:0)});
+        let pair=0;
+        let strongExists=slotHasStrong(k,n,poolAll);
+        let weakExists=slotHasWeak(k,n,poolAll);
+        if(isWeakStaff(s)) pair += strongExists ? 28 : -55;
+        if(isStrongStaff(s) && weakExists) pair += 14;
+        candidates.push({s,p,score:select + tScore + pair + (useOther?-140:0)});
       }
     }
     candidates.sort((a,b)=>b.score-a.score || a.p[1]-b.p[1] || a.p[2]-b.p[2]);
     return candidates[0]||null;
   }
-  return collect(false) || collect(true);
+  let bestMain = collect(false);
+  if(bestMain) return bestMain;
+  return collect(true);
 }
 function trimOverflow(k,poolAll,d){
   let guard=0;
@@ -810,17 +853,22 @@ function eventExtraCoverage(k,slot,poolAll){
   },0);
 }
 function chooseBestPartTimerForEvent(k,idx,d,used,poolAll,slot){
-  let candidates=[];
-  for(let s of poolAll){
-    if(!isPartTimer(s)) continue;
-    if(used.has(s.id)) continue;
-    let select=slotSelectScore(s,idx);
-    if(select<=-9999) continue;
-    let ps=patterns(s,d).filter(p=>allowed(s,d,p)&&p[1]<slot[1]&&p[2]>slot[0]);
-    for(let p of ps)candidates.push({s,p,score:select});
+  function collect(useOther){
+    let candidates=[];
+    for(let s of poolAll){
+      if(!isPartTimer(s)) continue;
+      if(used.has(s.id)) continue;
+      let select=slotSelectScore(s,idx);
+      if(select<=-9999) continue;
+      let ps=(useOther?otherPatterns(s,d):mainPatterns(s,d)).filter(p=>allowed(s,d,p)&&p[1]<slot[1]&&p[2]>slot[0]);
+      for(let p of ps)candidates.push({s,p,score:select + (useOther?-120:0)});
+    }
+    candidates.sort((a,b)=>b.score-a.score || a.p[1]-b.p[1] || a.p[2]-b.p[2]);
+    return candidates[0]||null;
   }
-  candidates.sort((a,b)=>b.score-a.score || a.p[1]-b.p[1] || a.p[2]-b.p[2]);
-  return candidates[0]||null;
+  let bestMain=collect(false);
+  if(bestMain) return bestMain;
+  return collect(true);
 }
 function ensureEventExtras(k,idx,d,used,poolAll){
   eventExtraSlots(d).forEach(slot=>{
@@ -862,21 +910,25 @@ function hasClosingSkillV33(k,skill,d){
 }
 function addOneCloserV33(k,idx,d,used,poolAll,filterFn){
   let close=closeHour(d);
-  let candidates=[];
-  for(let s of poolAll){
-    if(used.has(s.id)) continue;
-    if(streak(s.id,idx)>=Number(s.max||5)) continue;
-    if(filterFn && !filterFn(s)) continue;
-    let ps=patterns(s,d).filter(p=>allowed(s,d,p)&&p.end>=close&&employeeHardLimitOk(s,p,idx));
-    for(let p of ps){
-      let sc=slotSelectScore(s,idx);
-      if(typeof turnoverPatternScore==='function') sc+=turnoverPatternScore(p,d,s,[20,close,3,4,'ラスト']);
-      candidates.push({s,p,score:sc});
+  function collect(useOther){
+    let candidates=[];
+    for(let s of poolAll){
+      if(used.has(s.id)) continue;
+      if(streak(s.id,idx)>=Number(s.max||5)) continue;
+      if(filterFn && !filterFn(s)) continue;
+      let ps=(useOther?otherPatterns(s,d):mainPatterns(s,d)).filter(p=>allowed(s,d,p)&&p.end>=close&&employeeHardLimitOk(s,p,idx));
+      for(let p of ps){
+        let sc=slotSelectScore(s,idx);
+        if(typeof turnoverPatternScore==='function') sc+=turnoverPatternScore(p,d,s,[20,close,3,4,'ラスト']);
+        candidates.push({s,p,score:sc + (useOther?-120:0)});
+      }
     }
+    candidates.sort((a,b)=>b.score-a.score || a.p[1]-b.p[1]);
+    return candidates[0]||null;
   }
-  candidates.sort((a,b)=>b.score-a.score || a.p[1]-b.p[1]);
-  if(!candidates.length) return false;
-  assignPattern(k,idx,d,used,candidates[0].s,candidates[0].p);
+  let best = collect(false) || collect(true);
+  if(!best) return false;
+  assignPattern(k,idx,d,used,best.s,best.p);
   return true;
 }
 function ensureClosingV33(k,idx,d,used,poolAll){
@@ -890,6 +942,50 @@ function ensureClosingV33(k,idx,d,used,poolAll){
   while(closingCountV33(k,'ホール',d)<3 && guard++<8){
     if(!addOneCloserV33(k,idx,d,used,poolAll,null)) break;
   }
+}
+
+
+function targetEmployeeWorkDays(){
+  return Math.max(0, dates.length-8);
+}
+function bestEmployeeFillPattern(s,d,idx){
+  // 社員の月8休みちょうど補正用。メイン時間を最優先、その他時間はメイン候補がない時だけ。
+  for(let useOther of [false,true]){
+    let ps=(useOther?otherPatterns(s,d):mainPatterns(s,d))
+      .filter(p=>allowed(s,d,p)&&employeeHardLimitOk(s,p,idx));
+    if(ps.length){
+      ps.sort((a,b)=>{
+        let scoreA=(a[2]-a[1]===9?50:0)+(a[2]-a[1]>=7?20:0)-Math.abs((a[2]-a[1])-9)*5;
+        let scoreB=(b[2]-b[1]===9?50:0)+(b[2]-b[1]>=7?20:0)-Math.abs((b[2]-b[1])-9)*5;
+        return scoreB-scoreA || a[1]-b[1];
+      });
+      return ps[0];
+    }
+  }
+  return null;
+}
+function ensureEmployeesExactEightRests(role){
+  // 「必ず月8休み」に近づける最終補正。希望休や週40hで不可能な場合は警告に残す。
+  let emps=staff.filter(s=>s.role===role && s.employment==='社員');
+  let target=targetEmployeeWorkDays();
+  emps.forEach(s=>{
+    let guard=0;
+    while(monthlyWorkDaysFor(s.id)<target && guard++<dates.length){
+      let best=null;
+      for(let idx=0; idx<dates.length; idx++){
+        let d=dates[idx], k=ymd(d);
+        if(schedule[k]?.[s.id]) continue;
+        let p=bestEmployeeFillPattern(s,d,idx);
+        if(!p) continue;
+        let shortage=needs(d).reduce((m,n)=>m+Math.max(0,n[2]-roleCoverage(k,n,staff.filter(x=>x.role===role))),0);
+        let score=shortage*30 + employeeBalanceBonus(s,idx) - weekScheduledHoursFor(s.id,idx)*0.2;
+        if(!best || score>best.score) best={idx,d,k,p,score};
+      }
+      if(!best) break;
+      schedule[best.k]??={};
+      schedule[best.k][s.id]={label:best.p[0],start:best.p[1],end:best.p[2]};
+    }
+  });
 }
 
 function autoMake(role){
@@ -908,18 +1004,28 @@ function autoMake(role){
       let setupCandidates=poolAll
         .filter(s=>s.set || s.skills?.includes('セッティング'))
         .sort((a,b)=>score(b)-score(a));
-      for(let s of setupCandidates){
-        let ps=patterns(s,d).filter(p=>allowed(s,d,p)&&coversSlot(p,setupSlot)&&employeeHardLimitOk(s,p,idx));
-        ps.sort((a,b)=>{
-          let prefA=(a[1]===9&&a[2]===13)?100:(a[1]===9&&a[2]===15)?80:(a[1]===9&&a[2]===17)?30:0;
-          let prefB=(b[1]===9&&b[2]===13)?100:(b[1]===9&&b[2]===15)?80:(b[1]===9&&b[2]===17)?30:0;
-          return prefB-prefA || a[2]-b[2];
-        });
-        if(ps.length && assignPattern(k,idx,d,used,s,ps[0])) break;
+      let setupDone=false;
+      for(let useOther of [false,true]){
+        if(useOther){
+          // メイン時間で入れるセッティング担当が誰もいない時だけその他時間
+          let hasAnyMain=setupCandidates.some(s=>mainPatterns(s,d).some(p=>allowed(s,d,p)&&coversSlot(p,setupSlot)&&employeeHardLimitOk(s,p,idx)));
+          if(hasAnyMain) break;
+        }
+        for(let s of setupCandidates){
+          let ps=(useOther?otherPatterns(s,d):mainPatterns(s,d)).filter(p=>allowed(s,d,p)&&coversSlot(p,setupSlot)&&employeeHardLimitOk(s,p,idx));
+          ps.sort((a,b)=>{
+            let prefA=(a[1]===9&&a[2]===13)?100:(a[1]===9&&a[2]===15)?80:(a[1]===9&&a[2]===17)?30:0;
+            let prefB=(b[1]===9&&b[2]===13)?100:(b[1]===9&&b[2]===15)?80:(b[1]===9&&b[2]===17)?30:0;
+            return prefB-prefA || a[2]-b[2];
+          });
+          if(ps.length && assignPattern(k,idx,d,used,s,ps[0])) {setupDone=true; break;}
+        }
+        if(setupDone) break;
       }
     }
 
     ensureClosingV33(k,idx,d,used,poolAll);
+ensureClosingV33(k,idx,d,used,poolAll);
     ensureEventExtras(k,idx,d,used,poolAll);
 
     needs(d).forEach(n=>{
@@ -935,6 +1041,7 @@ function autoMake(role){
     trimOverflow(k,poolAll,d);
     rotateEarlyLeavers(k,d,poolAll);
   });
+  ensureEmployeesExactEightRests(role);
   quickSave(); renderAll();
   alert(role==='ホール' ? 'ホールの自動生成をしました' : '調理場は必要人数ルール未設定のため、今は自動生成していません');
 }
@@ -1078,7 +1185,7 @@ function renderWarnings(){
 
   staff.filter(s=>s.employment==='社員').forEach(s=>{
     let workDays=monthScheduledDaysFor(s.id);
-    if(dates.length-workDays!==8) w.push(`${s.name}：社員の月休みが8日ちょうどではありません（休み${dates.length-workDays}日）`);
+    if(dates.length-workDays!==8) w.push(`${s.name}：社員の休みが月8回ちょうどではありません（休み${dates.length-workDays}日）`);
     dates.forEach((d,idx)=>{
       if(weekScheduledHoursFor(s.id,idx)>40) w.push(`${s.name}：週40時間を超えています`);
     });
