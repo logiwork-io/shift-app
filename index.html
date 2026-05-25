@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v39</title>
+<title>1人管理用シフト生成アプリ v40</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -202,7 +202,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v39</h1><div class="sub">自動生成復旧・入れすぎ警告強化版</div></header>
+<header><h1>1人管理用シフト生成アプリ v40</h1><div class="sub">自動生成実行テスト済み・関数漏れ修正版</div></header>
 
 <main>
 <section class="card">
@@ -277,7 +277,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v39_single_manager';
+const storeKey='shift_v40_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -1180,6 +1180,22 @@ function renderHours(){
     staff.map(s=>`<tr><td>${s.name}</td><td>${p[s.id].m}h</td>${weeks.map(w=>`<td>${p[s.id].w[w]||0}h</td>`).join('')}</tr>`).join('')+'</tbody>';
   renderWarnings();
 }
+
+function dayHeadCountSafe(k,role='ホール'){
+  let pool = (typeof candidatePoolForRole==='function') ? candidatePoolForRole(role) : staff.filter(s=>s.role===role);
+  let ids=new Set(pool.map(s=>s.id));
+  return Object.keys(schedule[k]||{}).filter(id=>ids.has(id)).length;
+}
+function setupRequirementOkSafe(k,d){
+  return staff.some(s=>s.role==='ホール' && (s.set||s.skills?.includes('セッティング')) && schedule[k]?.[s.id]?.start<=9 && schedule[k]?.[s.id]?.end>=11);
+}
+function countNineStartSafe(k){
+  return Object.entries(schedule[k]||{}).filter(([id,p])=>{
+    let s=staff.find(x=>x.id===id);
+    return s?.role==='ホール' && p.start===9;
+  }).length;
+}
+
 function renderWarnings(){
   let w=[];
   dates.forEach((d,i)=>{
@@ -1191,10 +1207,6 @@ function renderWarnings(){
     if(hallWorkers.length<targetMin) w.push(`${label}：ホール人数が目安より少ないです（${hallWorkers.length}人）`);
     if(hallWorkers.length>targetMax) w.push(`${label}：ホール人数が目安より多いです（${hallWorkers.length}人）`);
     if(countNineStartSafe(k)>1) w.push(`${label}：9時入りが複数います`);
-    needs(d).forEach(n=>{
-      let pool=candidatePoolForRole('ホール');
-      if(roleHeadCount(k,n,pool)<n[2]) w.push(`${label}：${n[0]}〜${n[1]}時の実人数が最低人数未満です`);
-    });
     needs(d).forEach(n=>{
       let pool=candidatePoolForRole('ホール');
       if(roleHeadCount(k,n,pool)<n[2]) w.push(`${label}：${n[0]}〜${n[1]}時の実人数が最低人数未満です`);
