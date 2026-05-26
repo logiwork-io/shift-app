@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v53</title>
+<title>1人管理用シフト生成アプリ v55</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -202,7 +202,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v53</h1><div class="sub">最低実人数優先・戦力換算調整版</div></header>
+<header><h1>1人管理用シフト生成アプリ v55</h1><div class="sub">このチャット確定仕様のみ・メイン時間固定/フリー対応版</div></header>
 
 <main>
 <section class="card">
@@ -277,7 +277,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v53_single_manager';
+const storeKey='shift_v55_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -345,20 +345,11 @@ function makeDates(){
   day.innerHTML=dates.map(d=>`<option value="${ymd(d)}">${d.getMonth()+1}/${d.getDate()}（${wd(d)}）</option>`).join('');
 }
 function findLatestSavedData(){
-  let keys=[];
-  for(let i=0;i<localStorage.length;i++){
-    let k=localStorage.key(i);
-    if(/^shift_v\d+_single_manager$/.test(k)) keys.push(k);
-  }
-  keys.sort((a,b)=>(Number((b.match(/\d+/)||[0])[0])-Number((a.match(/\d+/)||[0])[0])));
-  for(let k of keys){
-    try{
-      let d=JSON.parse(localStorage.getItem(k)||'{}');
-      if(d && (d.staff||d.requests||d.schedule)) return d;
-    }catch(e){}
-  }
-  return {};
+  // v55: 前バージョンや別チャット由来の古いデータは自動では読まない。
+  // 移行は「データをコピー」→「貼り付けで読み込み」だけ。
+  return null;
 }
+
 function applyDataObject(d){
   if(d.staff) staff=d.staff;
   staff.forEach(s=>{
@@ -367,6 +358,7 @@ function applyDataObject(d){
     if(s.weekend===undefined) s.weekend = (s.noWeekend?false:true);
     if(s.category===undefined) s.category=staffCategory(s);
     if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
+    if(s.mainMode===undefined) s.mainMode='フリー';
   });
   requests=d.requests||{};
   schedule=d.schedule||{};
@@ -374,12 +366,16 @@ function applyDataObject(d){
   events=d.events||{};
 }
 function loadData(){
+  // v55: 現在の保存キーだけ読む。前URL/前バージョンのデータは自動では読まない。
   try{
     let raw=localStorage.getItem(storeKey);
-    let d=raw?JSON.parse(raw):findLatestSavedData();
+    let d=raw?JSON.parse(raw):null;
     applyDataObject(d||{});
-  }catch(e){}
+  }catch(e){
+    applyDataObject({});
+  }
 }
+
 function saveData(){
   localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events}));
   alert('保存しました');
@@ -1141,6 +1137,13 @@ function reqOkV50(s,d,p){
 }
 function patternPoolV50(s,d,idx,k,{slot=null,close=false,setup=false,preferMain=true}={}){
   let base=(closeHour(d)===23?patEnd:patWeek);
+  let fixed = s.mainMode==='固定';
+
+  function mainExactOk(p){
+    // 固定の人はメイン時間そのままのみ。セッティング/締めでも勝手に前後させない。
+    return Number(p[1])===Number(s.bs) && Number(p[2])===Number(s.be);
+  }
+
   function filt(useOther){
     return base.filter(p=>{
       if(patternDuration(p)>9) return false;
@@ -1148,6 +1151,12 @@ function patternPoolV50(s,d,idx,k,{slot=null,close=false,setup=false,preferMain=
       if(!setup && p[1]===9) return false;
       if(close && p[2]<closeHour(d)) return false;
       if(slot && !(p[1]<slot[1] && p[2]>slot[0])) return false;
+
+      if(fixed){
+        if(useOther) return false;
+        if(!mainExactOk(p)) return false;
+      }
+
       if(!rangeOkV50(s,p,useOther,d)) return false;
       if(!reqOkV50(s,d,p)) return false;
       if(s.employment==='社員'){
@@ -1159,8 +1168,10 @@ function patternPoolV50(s,d,idx,k,{slot=null,close=false,setup=false,preferMain=
       return true;
     });
   }
+
   let main=filt(false).map(p=>({p,useOther:false}));
   if(preferMain && main.length) return main;
+  if(fixed) return main; // 固定はその他時間を使わない
   return main.concat(filt(true).map(p=>({p,useOther:true})));
 }
 function assignV50(k,s,p){
@@ -1595,7 +1606,7 @@ function renderStaff(){
   staffList.innerHTML=list.length?list.map(s=>`
     <button class="staffBtn" onclick="openDetail('${s.id}')">
       <strong>${s.name}</strong>
-      <div class="meta">${staffCategory(s)} / ${s.role} / ${s.bs}:00〜${s.be}:00</div>
+      <div class="meta">${staffCategory(s)} / ${s.role} / ${s.bs}:00〜${s.be}:00 / ${s.mainMode||"フリー"}</div>
       <div class="orderBtns" onclick="event.stopPropagation()">
         <span class="moveBtns">
           <button class="sec" onclick="moveStaff('${s.id}',-1)">↑</button>
@@ -1620,6 +1631,7 @@ function openDetail(id){
   if(s.oe===undefined) s.oe='';
   if(s.weekend===undefined) s.weekend=true;
   if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
+  if(s.mainMode===undefined) s.mainMode='フリー';
   if(s.employment===undefined) s.employment = s.category==='社員' ? '社員' : 'バイト';
   if(s.category===undefined) s.category=staffCategory(s);
   detailTitle.textContent=s.name+' 詳細';
@@ -1633,6 +1645,7 @@ function openDetail(id){
     <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
     <div><label>その他時間を使う日</label><select onchange="setStaff('otherMode',this.value)"><option value="フリー" ${s.otherMode==='フリー'||s.otherMode==='なし'?'selected':''}>フリー</option><option ${s.otherMode==='平日'?'selected':''}>平日</option><option ${s.otherMode==='土日祝'?'selected':''}>土日祝</option></select></div>
     <div class="wide"><label>メイン時間</label><div class="timeRange"><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div></div>
+    <div class="wide"><label>メイン時間タイプ</label><select onchange="setStaff('mainMode',this.value)"><option value="フリー" ${s.mainMode!=='固定'?'selected':''}>フリー（多少の前後OK）</option><option value="固定" ${s.mainMode==='固定'?'selected':''}>固定（メイン時間そのまま）</option></select><div class="otherModeNote">固定は早入り・早上がり・延長なし。フリーは不足時に少し前後調整します。</div></div>
     <div class="wide"><label>その他時間</label><div class="timeRange"><select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select></div><div class="otherModeNote">その他時間は「フリー」ならいつでも、平日/土日祝ならその日だけ候補になります。</div></div>
     <div class="wide"><label>ランク</label><select onchange="setStaff('rank',this.value)"><option value="" ${!s.rank?'selected':''}>未設定</option><option ${s.rank==='A'?'selected':''}>A</option><option ${s.rank==='B'?'selected':''}>B</option><option ${s.rank==='C'?'selected':''}>C</option><option ${s.rank==='D'?'selected':''}>D</option><option ${s.rank==='E'?'selected':''}>E</option></select></div>
   </div>
@@ -1661,7 +1674,7 @@ function toggleSkill(skill,on){
   quickSave();openDetail(editing);renderAll();
 }
 function closeDetail(){detailModal.classList.add('hide');editing=null;renderStaff();renderAll()}
-function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
+function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
 function deleteStaff(id){if(confirm('削除しますか？')){staff=staff.filter(s=>s.id!==id);delete requests[id];Object.keys(schedule).forEach(k=>delete schedule[k][id]);delete actual[id];quickSave();closeDetail()}}
 function openPreview(){renderPreview();preview.classList.remove('hide')}
 function closePreview(){preview.classList.add('hide')}
