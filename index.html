@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v55</title>
+<title>1人管理用シフト生成アプリ v56</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -194,6 +194,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 .cat-バイト学生{background:#f5eeff!important}
 .catBadge{display:inline-block;border-radius:999px;padding:2px 6px;font-size:10px;background:#eef6f6;color:#345}
 .otherModeNote{font-size:10px;color:var(--m);margin-top:2px}
+.mainModeSelect{min-width:82px;max-width:92px;flex:0 0 86px}
 
 
 .dataBox{width:100%;min-height:92px;border:1px solid var(--l);border-radius:12px;padding:8px;font-size:12px}
@@ -202,7 +203,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v55</h1><div class="sub">このチャット確定仕様のみ・メイン時間固定/フリー対応版</div></header>
+<header><h1>1人管理用シフト生成アプリ v56</h1><div class="sub">メイン時間タイプ位置調整・その他時間表示修正版</div></header>
 
 <main>
 <section class="card">
@@ -277,7 +278,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v55_single_manager';
+const storeKey='shift_v56_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -345,7 +346,7 @@ function makeDates(){
   day.innerHTML=dates.map(d=>`<option value="${ymd(d)}">${d.getMonth()+1}/${d.getDate()}（${wd(d)}）</option>`).join('');
 }
 function findLatestSavedData(){
-  // v55: 前バージョンや別チャット由来の古いデータは自動では読まない。
+  // v56: 前バージョンや別チャット由来の古いデータは自動では読まない。
   // 移行は「データをコピー」→「貼り付けで読み込み」だけ。
   return null;
 }
@@ -1109,7 +1110,9 @@ function dayTypeOkForOtherV50(s,d){
 function rangeOkV50(s,p,useOther,d){
   if(isWeekend(d) && s.weekend===false) return false;
   if(useOther){
-    // その他時間は片方だけ空欄でも読む。
+    // その他時間は、開始か終了のどちらかが選ばれている時だけ候補。
+    // 両方未選択なら「メイン時間のみ」。
+    if((s.os==='' || s.os===undefined) && (s.oe==='' || s.oe===undefined)) return false;
     // os空欄・oe=23 → メイン開始〜23
     // os=9・oe空欄 → 9〜メイン終了
     let os = (s.os==='' || s.os===undefined) ? s.bs : s.os;
@@ -1644,9 +1647,8 @@ function openDetail(id){
     <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
     <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
     <div><label>その他時間を使う日</label><select onchange="setStaff('otherMode',this.value)"><option value="フリー" ${s.otherMode==='フリー'||s.otherMode==='なし'?'selected':''}>フリー</option><option ${s.otherMode==='平日'?'selected':''}>平日</option><option ${s.otherMode==='土日祝'?'selected':''}>土日祝</option></select></div>
-    <div class="wide"><label>メイン時間</label><div class="timeRange"><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div></div>
-    <div class="wide"><label>メイン時間タイプ</label><select onchange="setStaff('mainMode',this.value)"><option value="フリー" ${s.mainMode!=='固定'?'selected':''}>フリー（多少の前後OK）</option><option value="固定" ${s.mainMode==='固定'?'selected':''}>固定（メイン時間そのまま）</option></select><div class="otherModeNote">固定は早入り・早上がり・延長なし。フリーは不足時に少し前後調整します。</div></div>
-    <div class="wide"><label>その他時間</label><div class="timeRange"><select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select></div><div class="otherModeNote">その他時間は「フリー」ならいつでも、平日/土日祝ならその日だけ候補になります。</div></div>
+    <div class="wide"><label>メイン時間</label><div class="timeRange"><select class="mainModeSelect" onchange="setStaff('mainMode',this.value)"><option value="フリー" ${s.mainMode!=='固定'?'selected':''}>フリー</option><option value="固定" ${s.mainMode==='固定'?'selected':''}>固定</option></select><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div><div class="otherModeNote">固定は早入り・早上がり・延長なし。フリーは不足時に少し前後調整します。</div></div>
+    <div class="wide"><label>その他時間</label><div class="timeRange"><select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select></div><div class="otherModeNote">その他時間は、時間が選ばれている時だけ候補になります。未選択ならメイン時間のみです。</div></div>
     <div class="wide"><label>ランク</label><select onchange="setStaff('rank',this.value)"><option value="" ${!s.rank?'selected':''}>未設定</option><option ${s.rank==='A'?'selected':''}>A</option><option ${s.rank==='B'?'selected':''}>B</option><option ${s.rank==='C'?'selected':''}>C</option><option ${s.rank==='D'?'selected':''}>D</option><option ${s.rank==='E'?'selected':''}>E</option></select></div>
   </div>
   <div class="skillGroup" style="margin-top:12px">
@@ -1663,7 +1665,7 @@ function openDetail(id){
   detailModal.classList.remove('hide');
 }
 function timeOpts(cur,a,b){let out='';for(let h=a;h<=b;h++)out+=`<option value="${h}" ${Number(cur)===h?'selected':''}>${h}:00</option>`;return out}
-function timeOptsWithNone(cur,a,b){let out=`<option value="" ${cur===''||cur===undefined?'selected':''}>フリー</option>`;for(let h=a;h<=b;h++)out+=`<option value="${h}" ${String(cur)===String(h)?'selected':''}>${h}:00</option>`;return out}
+function timeOptsWithNone(cur,a,b){let out=`<option value="" ${cur===''||cur===undefined?'selected':''}>時間のみ</option>`;for(let h=a;h<=b;h++)out+=`<option value="${h}" ${String(cur)===String(h)?'selected':''}>${h}:00</option>`;return out}
 function setStaff(key,val){let s=staff.find(x=>x.id===editing);s[key]=val;quickSave();openDetail(editing);renderAll();renderStaff()}
 function toggleSkill(skill,on){
   let s=staff.find(x=>x.id===editing);s.skills??=[];
