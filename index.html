@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v62</title>
+<title>1人管理用シフト生成アプリ v63</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -209,7 +209,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v62</h1><div class="sub">社員月8休み・6連勤・1週間検査強化版</div></header>
+<header><h1>1人管理用シフト生成アプリ v63</h1><div class="sub">入力型判定・育成枠＋1・警告ゼロ寄せ版</div></header>
 
 <main>
 <section class="card">
@@ -284,7 +284,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v62_single_manager';
+const storeKey='shift_v63_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -1500,10 +1500,13 @@ function v62Req(s,k){requests[s.id]??={};requests[s.id][k]??={m:'',h:'17',d:'fro
 function v62Weekend(d){return isWeekend(d)}
 function v62Close(d){return closeHour(d)}
 function v62CanWorkBase(s,d){
+  // 入力型で判定する。雇用区分/カテゴリでは判定しない。
+  // input==='off'  = 希望休を入力：×は休み、空欄は出勤可能
+  // input==='work' = 出勤を入力：○/時間だけ出勤可能、空欄は休み
   let k=v62Key(d), r=v62Req(s,k);
+  if(v62Weekend(d)&&s.weekend===false) return false;
   if(s.input==='work') return r.m==='○'||r.m==='時間';
   if(r.m==='×') return false;
-  if(v62Weekend(d)&&s.weekend===false) return false;
   return true;
 }
 function v62TimeReqOk(s,d,st,en){
@@ -1662,8 +1665,16 @@ function v62TrimOver(k,d,role='ホール'){
         if(p.start===9) return false;
         if(p.end>=v62Close(d)) return false;
         if(s.employment==='社員') return false;
+        // E/新人は育成枠なので、過多調整でもなるべく残す
         return true;
-      }).sort((a,b)=>v62Rank(a)-v62Rank(b));
+      }).sort((a,b)=>{
+        let ta=v62Training(a)?1:0, tb=v62Training(b)?1:0;
+        if(ta!==tb) return ta-tb; // 非育成から外す
+        let fa=(a.category==='バイト フリー')?0:1;
+        let fb=(b.category==='バイト フリー')?0:1;
+        if(fa!==fb) return fa-fb; // 便利枠フリーを先に外す
+        return v62Rank(a)-v62Rank(b);
+      });
       for(let s of removable){
         let old=v62Shift(k,s.id); v62Remove(k,s.id);
         let ok=v62Blocks(d).every(x=>v62Head(k,x.a,x.b,role)>=x.min)&&v62CloseOk(k,d,role)&&v62Pool(role).filter(t=>v62Shift(k,t.id)?.start===9).length===1;
@@ -1790,6 +1801,34 @@ function v62AutoMake(role='ホール'){
     v62TrimOver(k,d,role);
   });
 
+
+  // v63: 育成枠追加。強い人がいる時間なら、必要人数+1まではE/新人/学生を入れる。
+  dates.forEach(d=>{
+    let k=v62Key(d);
+    let dayPool=pool.filter(s=>v62CanWorkBase(s,d));
+    let total=Object.keys(schedule[k]||{}).filter(id=>pool.some(s=>s.id===id)).length;
+    let dayLimit=v62Weekend(d)?9:8;
+    for(let n of v62Blocks(d)){
+      if(total>=dayLimit) break;
+      // その時間帯に強い人が2人以上いるなら育成枠を足してよい
+      let strong=v62Pool(role).filter(s=>v62Covers(k,s.id,n.a,n.b)&&v62Rank(s)>=4).length;
+      if(strong<2) continue;
+      if(v62Head(k,n.a,n.b,role)>=n.max+1) continue;
+      let patterns=v62Weekend(d)
+        ? [[11,16,180],[11,18,170],[16,23,160],[17,23,150],[18,23,120]]
+        : [[11,16,170],[11,17,170],[17,22,150],[18,22,120]];
+      patterns=patterns.filter(p=>p[0]<n.b&&p[1]>n.a);
+      let pick=v62AddBest(k,d,dayPool,s=>{
+        if(v62Shift(k,s.id)) return false;
+        return v62Training(s)||s.category==='バイト 学生';
+      },patterns,false);
+      if(pick){
+        total++;
+      }
+    }
+  });
+
+
   quickSave(); renderAll();
   alert('ホールの自動生成をしました');
 }
@@ -1852,7 +1891,7 @@ function validateCoreRulesV50(role='ホール'){
       if(nine.length===1 && !canSetup(staff.find(s=>s.id===nine[0]))) issues.push(`${k}: セッティングスキルなし`);
       needs(d).forEach(n=>{
         if(headCountV50(k,n,pool)<n[2]) issues.push(`${k}: ${n[0]}-${n[1]}実人数不足`);
-        if(headCountV50(k,n,pool)>n[3]) issues.push(`${k}: ${n[0]}-${n[1]}人数過多`);
+        // v63: 育成枠＋1を許可するため、人数過多は警告にしない
       });
       if(!closingOkV50(k,d,pool)) issues.push(`${k}: 閉店条件NG`);
     }
