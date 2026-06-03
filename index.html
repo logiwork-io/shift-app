@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v63</title>
+<title>1人管理用シフト生成アプリ v67</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -209,7 +209,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v63</h1><div class="sub">入力型判定・育成枠＋1・警告ゼロ寄せ版</div></header>
+<header><h1>1人管理用シフト生成アプリ v67</h1><div class="sub">社員13時重複分散・15時入り優先版</div></header>
 
 <main>
 <section class="card">
@@ -284,7 +284,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v63_single_manager';
+const storeKey='shift_v67_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -1690,6 +1690,7 @@ function v62AutoMake(role='ホール'){
   dates.forEach(d=>{let k=v62Key(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id])});
   if(role!=='ホール'){quickSave();renderAll();alert('調理場は必要人数ルール未設定のため、今は自動生成していません');return}
   let empOff=v62PlanEmployeeOffs(role);
+  window.v65EmployeeOffPlan = empOff;
 
   dates.forEach((d,idx)=>{
     let k=v62Key(d), close=v62Close(d);
@@ -1829,6 +1830,50 @@ function v62AutoMake(role='ホール'){
   });
 
 
+  v64PostProcess(role);
+
+  // v65 final: 社員8休み固定の最終補修。予定休み日に社員が入っていたら必ず外す。
+  staff.filter(s=>s.role===role&&s.employment==='社員').forEach(s=>{
+    dates.forEach(d=>{
+      let k=v62Key(d);
+      if(v65EmployeeOffLocked(s,k) && v62Shift(k,s.id)){
+        v62Remove(k,s.id);
+      }
+    });
+  });
+
+  // 社員が外れて不足/締めが壊れた場合、予定出勤日の社員だけで補修する。
+  dates.forEach(d=>{
+    let k=v62Key(d);
+    let dayPool=pool.filter(s=>v62CanWorkBase(s,d));
+    // 11時以降の社員常時配置だけを見る
+    if(v65AnyEmployeeCoverMissing(k,d,role)){
+      v64EnsureEmployeeEveryBlock(k,d,role);
+    }
+    // 閉店条件
+    if(!v62CloseOk(k,d,role)){
+      let close=v62Close(d);
+      v62AddBest(k,d,dayPool,s=>s.employment==='社員'&&!v65EmployeeOffLocked(s,k)&&v62CloseTimePossible(s,d),[[13,close,250],[15,close,240],[17,close,220]],true);
+      v62AddBest(k,d,dayPool,s=>v62RegSkill(s)&&!(s.employment==='社員'&&v65EmployeeOffLocked(s,k)),[[13,close,220],[15,close,210],[17,close,190]],true);
+      v62AddBest(k,d,dayPool,v62DrinkSkill,[[16,close,220],[17,close,220],[18,close,190],[13,close,150]],true);
+    }
+    // 最低人数
+    for(let n of v62Blocks(d)){
+      let guard=0;
+      while(v62Head(k,n.a,n.b,role)<n.min && guard++<12){
+        let pats=v62Weekend(d)?[[11,16,190],[11,18,190],[13,23,170],[14,23,165],[16,23,150],[17,23,140]]
+                              :[[11,17,190],[11,20,185],[13,22,170],[15,22,160],[17,22,140]];
+        pats=pats.filter(p=>p[0]<n.b&&p[1]>n.a);
+        let p=v62AddBest(k,d,dayPool,s=>!(s.employment==='社員'&&v65EmployeeOffLocked(s,k)),pats,true);
+        if(!p) break;
+      }
+    }
+    v64SpreadStartTimes(k,d,role);
+  });
+
+
+  v66FinalMonthRepair(role);
+  v67PostProcess(role);
   quickSave(); renderAll();
   alert('ホールの自動生成をしました');
 }
@@ -1881,6 +1926,401 @@ function trimOverV51(k,d,pool){
   }
 }
 
+
+
+function v65EmployeeOffLocked(s,k){
+  return s && s.employment==='社員' && window.v65EmployeeOffPlan && window.v65EmployeeOffPlan[s.id] && window.v65EmployeeOffPlan[s.id].has(k);
+}
+function v65EmployeeWouldOverwork(s,k){
+  // 社員は月8休み固定。予定休み日は絶対に追加しない。
+  if(!s || s.employment!=='社員') return false;
+  if(v65EmployeeOffLocked(s,k)) return true;
+  return false;
+}
+function v65OpenBlocksNoSetup(d){
+  // ホール社員は9〜11不要。11時以降だけ社員常時配置を見る。
+  let close=v62Close(d);
+  return [[11,13],[13,15],[15,17],[17,20],[20,close]].filter(x=>x[0]<x[1]);
+}
+function v65AnyEmployeeCoverMissing(k,d,role='ホール'){
+  return v65OpenBlocksNoSetup(d).some(x=>!v64EmployeeCovers(k,d,x[0],x[1],role));
+}
+function v65EmployeeCoversAllOpen(k,d,role='ホール'){
+  return !v65AnyEmployeeCoverMissing(k,d,role);
+}
+function v65SafeAssignEmployee(k,d,s,st,en){
+  if(s.employment==='社員' && v65EmployeeOffLocked(s,k)) return false;
+  v62Assign(k,s,st,en);
+  return true;
+}
+
+function v64OpenBlocks(d){
+  let close=v62Close(d);
+  return [[9,11],[11,13],[13,15],[15,17],[17,20],[20,close]].filter(x=>x[0]<x[1]);
+}
+function v64EmployeeCovers(k,d,a,b,role='ホール'){
+  return v62Pool(role).some(s=>s.employment==='社員' && v62Covers(k,s.id,a,b));
+}
+function v64AnyEmployeeCoverMissing(k,d,role='ホール'){
+  return v65AnyEmployeeCoverMissing(k,d,role);
+}
+function v64CanMoveStart(s,d,old,ns,role='ホール'){
+  if((s.mainMode||'フリー')==='固定') return false;
+  if(ns<9 || ns>=old.end) return false;
+  if(!v62CanShift(s,d,ns,old.end,true)) return false;
+  let dur=old.end-ns;
+  if(dur>9) return false;
+  if(s.employment==='社員' && (dur<7 || dur>9)) return false;
+  return true;
+}
+function v64StartCount(k,role='ホール'){
+  let m={};
+  v62Pool(role).forEach(s=>{
+    let p=v62Shift(k,s.id);
+    if(p) m[p.start]=(m[p.start]||0)+1;
+  });
+  return m;
+}
+function v64SpreadStartTimes(k,d,role='ホール'){
+  // 同時出勤は最大2人まで。固定は動かさず、フリー/非社員から前後へ散らす。
+  let guard=0;
+  while(guard++<40){
+    let counts=v64StartCount(k,role);
+    let over=Object.keys(counts).map(Number).filter(t=>counts[t]>2).sort((a,b)=>counts[b]-counts[a])[0];
+    if(over===undefined) break;
+    let pool=v62Pool(role).filter(s=>v62Shift(k,s.id)?.start===over);
+    pool.sort((a,b)=>{
+      let af=a.employment==='社員'?1:0, bf=b.employment==='社員'?1:0;
+      if(af!==bf) return af-bf;
+      let am=(a.mainMode||'フリー')==='固定'?1:0, bm=(b.mainMode||'フリー')==='固定'?1:0;
+      if(am!==bm) return am-bm;
+      let as=(v62RegSkill(a)||v62DrinkSkill(a)||v62SetupSkill(a))?1:0;
+      let bs=(v62RegSkill(b)||v62DrinkSkill(b)||v62SetupSkill(b))?1:0;
+      if(as!==bs) return as-bs;
+      return v62Rank(a)-v62Rank(b);
+    });
+    let did=false;
+    for(let s of pool){
+      let old=v62Shift(k,s.id);
+      let candidates=[over-1,over+1,over-2,over+2].filter(x=>x>=9 && x<old.end);
+      candidates.sort((a,b)=>{
+        let ca=(counts[a]||0), cb=(counts[b]||0);
+        if(ca!==cb) return ca-cb;
+        return Math.abs(a-over)-Math.abs(b-over);
+      });
+      for(let ns of candidates){
+        if((counts[ns]||0)>=2) continue;
+        if(!v64CanMoveStart(s,d,old,ns,role)) continue;
+        schedule[k][s.id]={label:String(ns),start:ns,end:old.end};
+        // 壊していないか確認
+        let ok=v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min) && v62CloseOk(k,d,role) && !v64AnyEmployeeCoverMissing(k,d,role);
+        if(ok){ did=true; break; }
+        schedule[k][s.id]=old;
+      }
+      if(did) break;
+    }
+    if(!did) break;
+  }
+}
+function v64EnsureEmployeeEveryBlock(k,d,role='ホール'){
+  // どの時間にも社員が最低1人。足りない時間は社員の開始をずらす/社員を追加する。
+  let blocks=v64OpenBlocks(d);
+  for(let blk of blocks){
+    if(v64EmployeeCovers(k,d,blk[0],blk[1],role)) continue;
+    let emps=v62Pool(role).filter(s=>s.employment==='社員'&&v62CanWorkBase(s,d)&&!v65EmployeeOffLocked(s,k));
+    // 既にその日いる社員を前倒し/後ろ倒ししてカバー
+    let fixed=false;
+    for(let s of emps){
+      let old=v62Shift(k,s.id);
+      if(!old) continue;
+      let st=Math.min(old.start,blk[0]);
+      let en=Math.max(old.end,blk[1]);
+      if(en-st>9) continue;
+      if(!v62CanShift(s,d,st,en,true)) continue;
+      schedule[k][s.id]={label:String(st),start:st,end:en};
+      if(v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min)&&v62CloseOk(k,d,role)){
+        fixed=true; break;
+      }
+      schedule[k][s.id]=old;
+    }
+    if(fixed) continue;
+    // いない社員を追加
+    let cands=[];
+    for(let s of emps){
+      if(v62Shift(k,s.id)) continue;
+      let starts=[blk[0],Math.max(9,blk[0]-1),11,13,15].filter((v,i,a)=>a.indexOf(v)===i);
+      for(let st of starts){
+        let en=Math.min(v62Close(d),st+8);
+        if(en<blk[1]) en=blk[1];
+        let c=v62Candidate(s,d,st,en,300,true);
+        if(c&&!v62WouldRunBad(s.id,k,st,en)) cands.push(c);
+      }
+    }
+    let p=v62Pick(cands);
+    if(p) v62Assign(k,p.s,p.st,p.en);
+  }
+}
+function v64PostProcess(role='ホール'){
+  dates.forEach(d=>{
+    let k=v62Key(d);
+    v64EnsureEmployeeEveryBlock(k,d,role);
+    v64SpreadStartTimes(k,d,role);
+  });
+}
+
+
+function v66EmployeeOffLocked(s,k){
+  return s && s.employment==='社員' && window.v65EmployeeOffPlan && window.v65EmployeeOffPlan[s.id] && window.v65EmployeeOffPlan[s.id].has(k);
+}
+function v66OpenBlocksNoSetup(d){
+  let close=v62Close(d);
+  return [[11,13],[13,15],[15,17],[17,20],[20,close]].filter(x=>x[0]<x[1]);
+}
+function v66EmployeeCovers(k,d,a,b,role='ホール'){
+  return v62Pool(role).some(s=>s.employment==='社員' && v62Covers(k,s.id,a,b));
+}
+function v66AnyEmployeeCoverMissing(k,d,role='ホール'){
+  return v66OpenBlocksNoSetup(d).some(x=>!v66EmployeeCovers(k,d,x[0],x[1],role));
+}
+function v66StartCounts(k,role='ホール'){
+  let m={};
+  v62Pool(role).forEach(s=>{
+    let p=v62Shift(k,s.id);
+    if(p) m[p.start]=(m[p.start]||0)+1;
+  });
+  return m;
+}
+function v66TryEmployeeAdd(k,d,s,role='ホール'){
+  if(v66EmployeeOffLocked(s,k) || v62Shift(k,s.id) || !v62CanWorkBase(s,d)) return false;
+  let close=v62Close(d);
+  let patterns=[];
+  // 基本時間に縛りすぎず、常時社員・閉店・同時出勤分散を考慮した候補
+  if(s.id==='a'){
+    patterns=[[11,20,260],[11,19,220],[12,20,210],[10,19,120],[13,22,80],[15,22,70]];
+  }else{
+    patterns=[[13,22,260],[15,23,250],[14,23,240],[13,23,230],[15,22,210],[12,21,160],[11,20,130]];
+  }
+  let cands=[];
+  patterns.forEach(p=>{
+    let st=p[0], en=p[1], sc=p[2];
+    if(en>close && close===22) en=22;
+    let c=v62Candidate(s,d,st,en,sc,true);
+    if(c && !v62WouldRunBad(s.id,k,st,en)){
+      let counts=v66StartCounts(k,role);
+      c.score += (counts[st]||0)>=2 ? -180 : 40;
+      // 社員不在が埋まる日を優先
+      let missingBefore=v66OpenBlocksNoSetup(d).filter(b=>!v66EmployeeCovers(k,d,b[0],b[1],role)).length;
+      let old=v62Shift(k,s.id);
+      v62Assign(k,s,st,en);
+      let missingAfter=v66OpenBlocksNoSetup(d).filter(b=>!v66EmployeeCovers(k,d,b[0],b[1],role)).length;
+      if(old) schedule[k][s.id]=old; else v62Remove(k,s.id);
+      c.score += (missingBefore-missingAfter)*120;
+      if(!v62CloseOk(k,d,role)) c.score += en>=close ? 60 : 0;
+      cands.push(c);
+    }
+  });
+  let pick=v62Pick(cands);
+  if(pick){ v62Assign(k,pick.s,pick.st,pick.en); return true; }
+  return false;
+}
+function v66FixEmployeeExact8(role='ホール'){
+  let emps=v62Pool(role).filter(s=>s.employment==='社員');
+  // 休みが多すぎる社員は、予定出勤日に必ず追加する
+  emps.forEach(s=>{
+    let guard=0;
+    while(v62OffDays(s.id)>8 && guard++<60){
+      let best=null;
+      dates.forEach(d=>{
+        let k=v62Key(d);
+        if(v66EmployeeOffLocked(s,k) || v62Shift(k,s.id) || !v62CanWorkBase(s,d)) return;
+        let close=v62Close(d);
+        let score=0;
+        // 社員不在/閉店NG/人数不足の日を優先
+        score += v66AnyEmployeeCoverMissing(k,d,role) ? 400 : 0;
+        score += !v62CloseOk(k,d,role) ? 250 : 0;
+        score += v62Blocks(d).reduce((a,n)=>a+Math.max(0,n.min-v62Head(k,n.a,n.b,role))*80,0);
+        // 休みが連続しすぎているところも出勤候補
+        let idx=dates.findIndex(x=>v62Key(x)===k);
+        let before=idx>0 && !v62Shift(v62Key(dates[idx-1]),s.id);
+        let after=idx<dates.length-1 && !v62Shift(v62Key(dates[idx+1]),s.id);
+        if(before&&after) score+=40;
+        if(!best || score>best.score) best={d,k,score};
+      });
+      if(!best) break;
+      if(!v66TryEmployeeAdd(best.k,best.d,s,role)) break;
+    }
+  });
+  // 休みが少なすぎる社員は、壊れにくい日から外す
+  emps.forEach(s=>{
+    let guard=0;
+    while(v62OffDays(s.id)<8 && guard++<60){
+      let best=null;
+      dates.forEach(d=>{
+        let k=v62Key(d), old=v62Shift(k,s.id);
+        if(!old) return;
+        // 希望休ではないが、閉店社員や唯一社員時間はなるべく外さない
+        if(old.end>=v62Close(d)) return;
+        v62Remove(k,s.id);
+        let ok=!v66AnyEmployeeCoverMissing(k,d,role) && v62CloseOk(k,d,role) && v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min);
+        if(ok){
+          let score=(old.start===11?40:0)+(old.end===20?20:0);
+          if(!best || score>best.score) best={k,old,score};
+        }
+        schedule[k][s.id]=old;
+      });
+      if(!best) break;
+      v62Remove(best.k,s.id);
+    }
+  });
+}
+function v66SpreadStartTimes(k,d,role='ホール'){
+  let guard=0;
+  while(guard++<80){
+    let counts=v66StartCounts(k,role);
+    let over=Object.keys(counts).map(Number).filter(t=>counts[t]>2).sort((a,b)=>counts[b]-counts[a])[0];
+    if(over===undefined) break;
+    let list=v62Pool(role).filter(s=>v62Shift(k,s.id)?.start===over);
+    list.sort((a,b)=>{
+      // 社員/固定/締め/セッティングは動かしにくく、バイトフリーや育成枠を動かす
+      let aEmp=a.employment==='社員'?1:0, bEmp=b.employment==='社員'?1:0;
+      if(aEmp!==bEmp) return aEmp-bEmp;
+      let aFix=(a.mainMode||'フリー')==='固定'?1:0, bFix=(b.mainMode||'フリー')==='固定'?1:0;
+      if(aFix!==bFix) return aFix-bFix;
+      let aSkill=(v62RegSkill(a)||v62DrinkSkill(a)||v62SetupSkill(a))?1:0;
+      let bSkill=(v62RegSkill(b)||v62DrinkSkill(b)||v62SetupSkill(b))?1:0;
+      if(aSkill!==bSkill) return aSkill-bSkill;
+      return v62Rank(a)-v62Rank(b);
+    });
+    let moved=false;
+    for(let s of list){
+      let old=v62Shift(k,s.id);
+      if(!old || old.start===9) continue;
+      let candidates=[over-1,over+1,over-2,over+2,over-3,over+3].filter(ns=>ns>=9 && ns<old.end);
+      candidates.sort((x,y)=>{
+        let cx=(counts[x]||0), cy=(counts[y]||0);
+        if(cx!==cy) return cx-cy;
+        return Math.abs(x-over)-Math.abs(y-over);
+      });
+      for(let ns of candidates){
+        if((counts[ns]||0)>=2) continue;
+        if(!v62CanShift(s,d,ns,old.end,true)) continue;
+        let dur=old.end-ns;
+        if(s.employment==='社員' && (dur<7 || dur>9)) continue;
+        schedule[k][s.id]={label:String(ns),start:ns,end:old.end};
+        let ok=!v66AnyEmployeeCoverMissing(k,d,role) && v62CloseOk(k,d,role) && v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min);
+        if(ok){ moved=true; break; }
+        schedule[k][s.id]=old;
+      }
+      if(moved) break;
+    }
+    if(!moved) break;
+  }
+}
+function v66FinalMonthRepair(role='ホール'){
+  v66FixEmployeeExact8(role);
+  dates.forEach(d=>{
+    let k=v62Key(d), dayPool=v62Pool(role).filter(s=>v62CanWorkBase(s,d));
+    // 11時以降の社員不在を補修
+    let guard=0;
+    while(v66AnyEmployeeCoverMissing(k,d,role) && guard++<12){
+      let emps=dayPool.filter(s=>s.employment==='社員'&&!v66EmployeeOffLocked(s,k));
+      let done=false;
+      for(let s of emps){
+        if(v66TryEmployeeAdd(k,d,s,role)){done=true; break;}
+        let old=v62Shift(k,s.id);
+        if(old){
+          let miss=v66OpenBlocksNoSetup(d).find(b=>!v66EmployeeCovers(k,d,b[0],b[1],role));
+          if(miss){
+            let st=Math.min(old.start,miss[0]), en=Math.max(old.end,miss[1]);
+            if(en-st<=9 && v62CanShift(s,d,st,en,true)){
+              schedule[k][s.id]={label:String(st),start:st,end:en};
+              done=true; break;
+            }
+          }
+        }
+      }
+      if(!done) break;
+    }
+    // 最低人数/閉店補修
+    if(!v62CloseOk(k,d,role)){
+      let close=v62Close(d);
+      v62AddBest(k,d,dayPool,s=>s.employment==='社員'&&!v66EmployeeOffLocked(s,k)&&v62CloseTimePossible(s,d),[[13,close,260],[15,close,250],[17,close,220]],true);
+      v62AddBest(k,d,dayPool,s=>v62RegSkill(s)&&!(s.employment==='社員'&&v66EmployeeOffLocked(s,k)),[[13,close,220],[15,close,220],[17,close,190]],true);
+      v62AddBest(k,d,dayPool,s=>v62DrinkSkill(s),[[16,close,230],[17,close,230],[18,close,190],[13,close,150]],true);
+    }
+    for(let n of v62Blocks(d)){
+      let safe=0;
+      while(v62Head(k,n.a,n.b,role)<n.min && safe++<12){
+        let pats=v62Weekend(d)?[[11,16,210],[11,18,200],[13,23,190],[14,23,180],[16,23,170],[17,23,150],[18,23,120]]
+                              :[[11,17,210],[11,20,200],[13,22,190],[15,22,180],[17,22,150],[18,22,120]];
+        pats=pats.filter(p=>p[0]<n.b&&p[1]>n.a);
+        if(!v62AddBest(k,d,dayPool,s=>!(s.employment==='社員'&&v66EmployeeOffLocked(s,k)),pats,true)) break;
+      }
+    }
+    v66SpreadStartTimes(k,d,role);
+  });
+  // 追加/補修で社員休みが動いた可能性をもう一度補正
+  v66FixEmployeeExact8(role);
+  dates.forEach(d=>v66SpreadStartTimes(v62Key(d),d,role));
+}
+
+
+function v67CanStretchSetupTo17(k,d,role='ホール'){
+  let setup=v62Pool(role).find(s=>v62Shift(k,s.id)?.start===9 && v62SetupSkill(s));
+  if(!setup) return false;
+  let old=v62Shift(k,setup.id);
+  if(old && old.end>=17) return true;
+  if(old && v62CanShift(setup,d,old.start,17,true)){
+    let backup={...old};
+    schedule[k][setup.id]={label:String(old.start),start:old.start,end:17};
+    let ok=v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min);
+    if(!ok) schedule[k][setup.id]=backup;
+    return ok;
+  }
+  return false;
+}
+function v67StaggerEmployee13(k,d,role='ホール'){
+  let emps=v62Pool(role).filter(s=>s.employment==='社員' && v62Shift(k,s.id)?.start===13);
+  if(emps.length<2) return;
+  let canBridge=v67CanStretchSetupTo17(k,d,role);
+  emps.sort((a,b)=>{
+    let aa=a.id==='a'?1:0, bb=b.id==='a'?1:0;
+    if(aa!==bb) return aa-bb;
+    return v62Rank(a)-v62Rank(b);
+  });
+  for(let idx=0; idx<emps.length-1; idx++){
+    let s=emps[idx], old=v62Shift(k,s.id);
+    if(!old) continue;
+    let close=v62Close(d);
+    let end=old.end;
+    if(end<close && v62CloseTimePossible(s,d)) end=close;
+    if(end>23) end=23;
+    if(end-15<7) end=Math.min(close,22);
+    if(!v62CanShift(s,d,15,end,true)) continue;
+    let backup={...old};
+    schedule[k][s.id]={label:'15',start:15,end:end};
+    let ok = !v66AnyEmployeeCoverMissing(k,d,role)
+      && v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min)
+      && v62CloseOk(k,d,role);
+    if(ok || canBridge){
+      if(!v62CloseOk(k,d,role)){
+        schedule[k][s.id]=backup;
+      }
+      let c=v62Pool(role).filter(x=>v62Shift(k,x.id)?.start===13).length;
+      if(c<=1) break;
+    }else{
+      schedule[k][s.id]=backup;
+    }
+  }
+}
+function v67PostProcess(role='ホール'){
+  dates.forEach(d=>{
+    let k=v62Key(d);
+    v67StaggerEmployee13(k,d,role);
+    if(typeof v66SpreadStartTimes==='function') v66SpreadStartTimes(k,d,role);
+  });
+}
+
 function validateCoreRulesV50(role='ホール'){
   let issues=[];
   dates.forEach(d=>{
@@ -1889,10 +2329,13 @@ function validateCoreRulesV50(role='ホール'){
       let nine=Object.keys(schedule[k]||{}).filter(id=>schedule[k][id].start===9 && pool.some(s=>s.id===id));
       if(nine.length!==1) issues.push(`${k}: 9時入り${nine.length}人`);
       if(nine.length===1 && !canSetup(staff.find(s=>s.id===nine[0]))) issues.push(`${k}: セッティングスキルなし`);
+      let starts={};
+      pool.forEach(s=>{let p=schedule[k]?.[s.id]; if(p) starts[p.start]=(starts[p.start]||0)+1;});
+      Object.keys(starts).forEach(t=>{ if(starts[t]>2) issues.push(`${k}: ${t}時出勤が${starts[t]}人`); });
       needs(d).forEach(n=>{
         if(headCountV50(k,n,pool)<n[2]) issues.push(`${k}: ${n[0]}-${n[1]}実人数不足`);
-        // v63: 育成枠＋1を許可するため、人数過多は警告にしない
       });
+      if(typeof v66AnyEmployeeCoverMissing==='function' && v66AnyEmployeeCoverMissing(k,d,role)) issues.push(`${k}: 社員不在の時間帯あり`);
       if(!closingOkV50(k,d,pool)) issues.push(`${k}: 閉店条件NG`);
     }
   });
