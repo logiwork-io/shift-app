@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v68</title>
+<title>1人管理用シフト生成アプリ v69</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -206,10 +206,14 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 .timeRange{display:flex!important;gap:4px!important;align-items:center!important;flex-wrap:nowrap!important;width:100%!important}
 .timeRange select{min-width:0!important}
 .mainModeSelect,.otherModeSelect{min-width:72px!important;max-width:84px!important;flex:0 0 78px!important}
+
+.eventAttendBox{margin-top:4px;font-size:10px;color:#775;display:flex;justify-content:center;gap:3px;align-items:center}
+.eventAttendBox input{width:15px;height:15px;accent-color:#c6a15b}
+.eventAttendMark{font-size:10px;color:#946b18;font-weight:800}
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v68</h1><div class="sub">社員8休み固定・イベント参加□・メイン時間4タイプ版</div></header>
+<header><h1>1人管理用シフト生成アプリ v69</h1><div class="sub">警告補修強化・社員8休み固定・イベント□表示版</div></header>
 
 <main>
 <section class="card">
@@ -284,7 +288,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v68_single_manager';
+const storeKey='shift_v69_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -386,10 +390,10 @@ function loadData(){
 }
 
 function saveData(){
-  localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events}));
+  localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}));
   alert('保存しました');
 }
-function quickSave(){localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events}))}
+function quickSave(){localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}))}
 
 function exportData(){
   try{
@@ -2842,7 +2846,12 @@ function openDetail(id){
     <div><label>入力型</label><select onchange="setStaff('input',this.value)"><option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option><option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option></select></div>
     <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
     <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
-    <div class="wide"><label>メイン時間</label><div class="timeRange"><select class="mainModeSelect" onchange="setStaff('mainMode',this.value)"><option value="フリー" ${s.mainMode!=='固定'?'selected':''}>フリー</option><option value="固定" ${s.mainMode==='固定'?'selected':''}>固定</option></select><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div><div class="otherModeNote">固定は早入り・早上がり・延長なし。フリーは不足時に少し前後調整します。</div></div>
+    <div class="wide"><label>メイン時間</label><div class="timeRange"><select class="mainModeSelect" onchange="setStaff('mainMode',this.value)">
+      <option value="出勤固定" ${s.mainMode==='出勤固定'?'selected':''}>出勤固定</option>
+      <option value="退勤固定" ${s.mainMode==='退勤固定'?'selected':''}>退勤固定</option>
+      <option value="時間固定" ${s.mainMode==='時間固定'||s.mainMode==='固定'?'selected':''}>時間固定</option>
+      <option value="フリー" ${!s.mainMode||s.mainMode==='フリー'?'selected':''}>フリー</option>
+    </select><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div><div class="otherModeNote">出勤固定=入り固定 / 退勤固定=上がり固定 / 時間固定=完全固定 / フリー=範囲内で調整。</div></div>
     <div class="wide"><label>その他時間</label><div class="timeRange"><select class="otherModeSelect" onchange="setStaff('otherMode',this.value)"><option value="フリー" ${s.otherMode==='フリー'||s.otherMode==='なし'?'selected':''}>フリー</option><option ${s.otherMode==='平日'?'selected':''}>平日</option><option ${s.otherMode==='土日祝'?'selected':''}>土日祝</option></select><select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select></div><div class="otherModeNote">その他時間は、時間が選ばれている時だけ候補になります。未選択ならメイン時間のみです。固定/フリーどちらでも最終手段です。</div></div>
     <div class="wide"><label>ランク</label><select onchange="setStaff('rank',this.value)"><option value="" ${!s.rank?'selected':''}>未設定</option><option ${s.rank==='A'?'selected':''}>A</option><option ${s.rank==='B'?'selected':''}>B</option><option ${s.rank==='C'?'selected':''}>C</option><option ${s.rank==='D'?'selected':''}>D</option><option ${s.rank==='E'?'selected':''}>E</option></select></div>
   </div>
@@ -2890,6 +2899,351 @@ function copyMonth(){
   });
   navigator.clipboard.writeText(text).then(()=>alert('コピーしました'));
 }
+
+// ===== v69 強化パッチ =====
+function v69SaveObj(){return {staff,requests,schedule,actual,events,eventAttend};}
+function saveData(){
+  localStorage.setItem(storeKey,JSON.stringify(v69SaveObj()));
+  alert('保存しました');
+}
+function quickSave(){localStorage.setItem(storeKey,JSON.stringify(v69SaveObj()))}
+
+function setEventAttend(id,k,val){
+  eventAttend[k]??={};
+  eventAttend[k][id]=!!val;
+  quickSave();
+  renderReq();
+}
+function v69EventAttend(s,k){return !!(eventAttend&&eventAttend[k]&&eventAttend[k][s.id]);}
+function renderReq(){
+  updateTabs();
+  let head='<thead>'+eventRowHtml()+'<tr><th>名前</th>'+dates.map(d=>`<th class="${d.getDay()==6?'sat':d.getDay()==0?'sun':''}">${d.getMonth()+1}/${d.getDate()}<br>${wd(d)}</th>`).join('')+'</tr></thead>';
+  let body=shown('input').map(s=>{
+    return '<tr><td class="'+catClass(s)+'">'+s.name+'<br><span class="catBadge">'+staffCategory(s)+'</span><br><span class="note">'+(s.input==='work'?'出勤入力':'希望休入力')+'</span>'+(s.employment==='社員'?'<br><span class="eventAttendMark">□=イベント</span>':'')+'</td>'+
+      dates.map(d=>{
+        let k=ymd(d), r=reqObj(s.id,k), opts=s.input==='work'?['','○','×','時間']:['','×','時間'];
+        let ev=s.employment==='社員'?`<div class="eventAttendBox"><label><input type="checkbox" ${v69EventAttend(s,k)?'checked':''} onchange="setEventAttend('${s.id}','${k}',this.checked)">□</label></div>`:'';
+        return `<td><select class="cell" onchange="setReq('${s.id}','${k}','m',this.value)">${opts.map(o=>`<option value="${o}" ${o===r.m?'selected':''}>${o||'空欄'}</option>`).join('')}</select>${r.m==='時間'?`<div class="pair"><select onchange="setReq('${s.id}','${k}','h',this.value)">${H.map(h=>`<option value="${h}" ${String(h)===String(r.h)?'selected':''}>${h}時</option>`).join('')}</select><select onchange="setReq('${s.id}','${k}','d',this.value)"><option value="from" ${r.d==='from'?'selected':''}>から</option><option value="until" ${r.d==='until'?'selected':''}>まで</option></select></div>`:''}${ev}</td>`;
+      }).join('')+'</tr>';
+  }).join('');
+  reqTable.innerHTML=head+'<tbody>'+body+'</tbody>';
+}
+
+function v69EmpOffPlan(role='ホール'){
+  let emps=staff.filter(s=>s.role===role&&s.employment==='社員');
+  let plans={}; let dayOff={};
+  dates.forEach(d=>dayOff[ymd(d)]=0);
+  emps.forEach(s=>plans[s.id]=new Set());
+
+  function requestedOff(s,k){
+    return reqObj(s.id,k).m==='×' && !v69EventAttend(s,k);
+  }
+  emps.forEach(s=>dates.forEach(d=>{
+    let k=ymd(d);
+    if(requestedOff(s,k)){plans[s.id].add(k);dayOff[k]++;}
+  }));
+
+  function wouldSix(s,set){
+    let run=0;
+    for(let d of dates){
+      let k=ymd(d);
+      if(set.has(k)){run=0;continue;}
+      run++;
+      if(run>=6) return true;
+    }
+    return false;
+  }
+  function dayHasClosingEmpIfOff(s,k){
+    let d=dates.find(x=>ymd(x)===k), close=v62Close(d);
+    let closers=emps.filter(e=>Number(e.be)>=close || Number(e.oe||0)>=close);
+    if(!closers.length) return true;
+    return closers.some(e=>e.id!==s.id && !plans[e.id].has(k));
+  }
+  function canAdd(s,k){
+    if(plans[s.id].has(k)) return false;
+    if(v69EventAttend(s,k)) return false;
+    if((dayOff[k]||0)>=Math.max(0,emps.length-1)) return false;
+    if(!dayHasClosingEmpIfOff(s,k)) return false;
+    return true;
+  }
+  // 6連勤を先に壊す
+  emps.forEach(s=>{
+    let guard=0;
+    while(wouldSix(s,plans[s.id]) && plans[s.id].size<8 && guard++<30){
+      let best=null;
+      dates.forEach((d,idx)=>{
+        let k=ymd(d);
+        if(!canAdd(s,k)) return;
+        let temp=new Set(plans[s.id]); temp.add(k);
+        let score=(wouldSix(s,temp)?0:500) - (dayOff[k]||0)*40;
+        // 休みが並びすぎないよう中央寄り
+        let near=[idx-1,idx+1].some(i=>dates[i]&&plans[s.id].has(ymd(dates[i])));
+        if(near) score-=80;
+        if(!best||score>best.score) best={k,score};
+      });
+      if(!best) break;
+      plans[s.id].add(best.k); dayOff[best.k]=(dayOff[best.k]||0)+1;
+    }
+  });
+  // 8休みまで追加
+  emps.forEach((s,si)=>{
+    let guard=0;
+    while(plans[s.id].size<8 && guard++<80){
+      let best=null;
+      dates.forEach((d,idx)=>{
+        let k=ymd(d);
+        if(!canAdd(s,k)) return;
+        let temp=new Set(plans[s.id]); temp.add(k);
+        let score=100 - (dayOff[k]||0)*50;
+        if(!wouldSix(s,temp)) score+=120;
+        let near=[idx-1,idx+1].some(i=>dates[i]&&plans[s.id].has(ymd(dates[i])));
+        if(near) score-=70;
+        score += ((idx+si)%4===0)?25:0;
+        if(!best||score>best.score) best={k,score};
+      });
+      if(!best) break;
+      plans[s.id].add(best.k); dayOff[best.k]=(dayOff[best.k]||0)+1;
+    }
+  });
+  return plans;
+}
+
+function v69StartCount(k,st,role='ホール'){
+  return v62Pool(role).filter(s=>v62Shift(k,s.id)?.start===st).length;
+}
+function v69CanPlace(k,s,d,st,en,allowOther=false,role='ホール'){
+  if(v62Shift(k,s.id)) return false;
+  if(st!==9 && v69StartCount(k,st,role)>=2) return false;
+  if(st===9 && v69StartCount(k,9,role)>=1) return false;
+  if(v62WouldRunBad(s.id,k,st,en)) return false;
+  return v68CanShift(s,d,st,en,allowOther);
+}
+function v69Assign(k,s,st,en){v62Assign(k,s,st,en);return true;}
+function v69TryAdd(k,d,pool,filter,patterns,allowOther=false,role='ホール'){
+  let c=[];
+  for(let s of pool.filter(filter)){
+    if(v62Shift(k,s.id)) continue;
+    for(let p of patterns){
+      let st=p[0], en=p[1], score=p[2]||0;
+      if(en<=st) continue;
+      if(v69CanPlace(k,s,d,st,en,allowOther,role)){
+        c.push({s,st,en,score:score+v62ScoreBase(s)+(allowOther?-90:0)-(v69StartCount(k,st,role)*80)});
+      }
+    }
+  }
+  c.sort((a,b)=>b.score-a.score||v62Rank(b.s)-v62Rank(a.s)||a.st-b.st||b.en-a.en);
+  let p=c[0];
+  if(p){v69Assign(k,p.s,p.st,p.en);return p;}
+  return null;
+}
+function v69CanExtend(s,d,st,en){
+  if(en-st>9) return false;
+  if(s.employment==='社員' && (en-st<7||en-st>9)) return false;
+  return v68CanShift(s,d,st,en,true);
+}
+function v69EnsureEmployeeBlock(k,d,a,b,role='ホール'){
+  if(v68EmployeeCovers(k,d,a,b,role)) return true;
+  let emps=v62Pool(role).filter(s=>s.employment==='社員'&&!v69EmpOffLocked(s,k)&&v68CanWorkBase(s,d));
+  // 既存社員を延長/前倒し
+  for(let s of emps){
+    let old=v62Shift(k,s.id);
+    if(!old) continue;
+    let st=Math.min(old.start,a), en=Math.max(old.end,b);
+    if(v69CanExtend(s,d,st,en)){
+      schedule[k][s.id]={label:String(st),start:st,end:en};
+      return true;
+    }
+  }
+  let close=v62Close(d);
+  let patterns=[];
+  if(b<=13) patterns=[[11,20,400],[11,19,350],[12,20,250]];
+  else if(b>=20) patterns=[[13,close,420],[15,close,410],[16,close,360],[17,close,320],[14,close,300]];
+  else patterns=[[13,22,360],[15,22,340],[11,20,320],[13,20,260]];
+  return !!(v69TryAdd(k,d,emps,s=>true,patterns,false,role)||v69TryAdd(k,d,emps,s=>true,patterns,true,role));
+}
+function v69EmpOffLocked(s,k){
+  return s&&s.employment==='社員'&&window.v69EmployeeOffPlan&&window.v69EmployeeOffPlan[s.id]&&window.v69EmployeeOffPlan[s.id].has(k)&&!v69EventAttend(s,k);
+}
+function v69SetupCounts(role='ホール'){
+  let m={};
+  dates.forEach(d=>{
+    let k=ymd(d);
+    v62Pool(role).forEach(s=>{
+      let p=v62Shift(k,s.id);
+      if(p&&p.start===9&&v62SetupSkill(s)) m[s.id]=(m[s.id]||0)+1;
+    });
+  });
+  return m;
+}
+function v69PickSetup(k,d,pool,role='ホール'){
+  let counts=v69SetupCounts(role), c=[];
+  for(let s of pool.filter(v62SetupSkill)){
+    for(let p of [[9,13,500],[9,15,460],[9,17,300]]){
+      if(v69CanPlace(k,s,d,p[0],p[1],true,role)){
+        c.push({s,st:p[0],en:p[1],score:p[2]+v62ScoreBase(s)-(counts[s.id]||0)*140});
+      }
+    }
+  }
+  c.sort((a,b)=>b.score-a.score||a.st-b.st);
+  let pick=c[0];
+  if(pick){v69Assign(k,pick.s,pick.st,pick.en);return pick;}
+  return null;
+}
+function v69NormalizeSetup(k,d,role='ホール'){
+  let pool=v62Pool(role);
+  let nine=pool.filter(s=>v62Shift(k,s.id)?.start===9);
+  if(nine.length>1){
+    let keep=nine.find(v62SetupSkill)||nine[0];
+    nine.forEach(s=>{if(s.id!==keep.id)v62Remove(k,s.id);});
+  }
+  nine=pool.filter(s=>v62Shift(k,s.id)?.start===9);
+  if(nine.length===0 || !v62SetupSkill(nine[0])){
+    nine.forEach(s=>v62Remove(k,s.id));
+    let avail=pool.filter(s=>v68CanWorkBase(s,d)&&!v69EmpOffLocked(s,k));
+    v69PickSetup(k,d,avail,role);
+  }
+}
+function v69NaturalEmployeePatterns(s,d,idxInDay,totalEmp){
+  let close=v62Close(d);
+  let bs=Number(s.bs)||13, be=Number(s.be)||close;
+  if(s.id==='a' || bs<=11) return [[11,20,500],[11,19,380],[12,20,260]];
+  if(bs===13 && totalEmp>=2){
+    return idxInDay===0 ? [[13,close,520],[13,22,500],[15,close,360]]
+                       : [[15,close,540],[13,close,420],[16,close,360]];
+  }
+  return [[bs,Math.min(be,close),460],[15,close,430],[17,close,360],[13,close,320]];
+}
+function v69ScheduleEmployeeWorkDays(k,d,role='ホール'){
+  let close=v62Close(d);
+  let emps=v62Pool(role).filter(s=>s.employment==='社員'&&!v69EmpOffLocked(s,k)&&v68CanWorkBase(s,d));
+  // イベント参加は必ず先
+  emps.sort((a,b)=>(v69EventAttend(b,k)?1:0)-(v69EventAttend(a,k)?1:0)||Number(a.bs)-Number(b.bs)||a.id.localeCompare(b.id));
+  emps.forEach((s,i)=>{
+    if(v62Shift(k,s.id)) return;
+    let pats=v69NaturalEmployeePatterns(s,d,i,emps.length);
+    let placed=v69TryAdd(k,d,[s],x=>true,pats,false,role)||v69TryAdd(k,d,[s],x=>true,pats,true,role);
+    if(!placed){
+      // 最後の保険。開始時刻2人制限を守れる範囲で候補を広げる
+      let broad=[[11,20,260],[12,20,220],[13,close,240],[14,close,230],[15,close,230],[16,close,200],[17,close,180]];
+      v69TryAdd(k,d,[s],x=>true,broad,true,role);
+    }
+  });
+}
+function v69ClosingOkStrict(k,d,role='ホール'){return v62CloseOk(k,d,role);}
+function v69EnsureClosing(k,d,dayPool,role='ホール'){
+  let close=v62Close(d);
+  let guard=0;
+  while(!v69ClosingOkStrict(k,d,role)&&guard++<8){
+    if(!v62Closers(k,d,role).some(s=>s.employment==='社員')){
+      v69TryAdd(k,d,dayPool,s=>s.employment==='社員'&&!v69EmpOffLocked(s,k)&&v62CloseTimePossible(s,d),[[13,close,420],[15,close,420],[16,close,360],[17,close,300]],true,role);
+    }else if(!v62Closers(k,d,role).some(v62RegSkill)){
+      v69TryAdd(k,d,dayPool,s=>v62RegSkill(s)&&!(s.employment==='社員'&&v69EmpOffLocked(s,k)),[[13,close,380],[15,close,360],[16,close,320],[17,close,300]],true,role);
+    }else if(!v62Closers(k,d,role).some(v62DrinkSkill)){
+      v69TryAdd(k,d,dayPool,s=>v62DrinkSkill(s),[[16,close,420],[17,close,420],[18,close,360],[15,close,300],[13,close,220]],true,role);
+    }else if(v62Closers(k,d,role).length<3){
+      v69TryAdd(k,d,dayPool,s=>true,[[16,close,300],[17,close,320],[18,close,280],[15,close,240],[14,close,200],[13,close,180]],true,role);
+    }else break;
+  }
+}
+function v69EnsureMinimums(k,d,dayPool,role='ホール'){
+  for(let n of v62Blocks(d)){
+    let guard=0;
+    while(v62Head(k,n.a,n.b,role)<n.min && guard++<14){
+      let close=v62Close(d);
+      let pats=v62Weekend(d)
+        ? [[11,16,300],[11,18,290],[12,18,250],[13,23,260],[14,23,250],[15,23,240],[16,23,230],[17,23,220],[18,23,180]]
+        : [[11,16,300],[11,17,300],[12,17,250],[11,20,260],[13,22,250],[15,22,240],[16,22,230],[17,22,220],[18,22,180]];
+      pats=pats.filter(p=>p[0]<n.b&&p[1]>n.a);
+      let pick=v69TryAdd(k,d,dayPool,s=>!(s.employment==='社員'&&v69EmpOffLocked(s,k)),pats,false,role)
+        || v69TryAdd(k,d,dayPool,s=>!(s.employment==='社員'&&v69EmpOffLocked(s,k)),pats,true,role);
+      if(!pick) break;
+    }
+  }
+}
+function v69SpreadStarts(k,d,role='ホール'){
+  let pool=v62Pool(role);
+  for(let st=10;st<=23;st++){
+    let same=pool.filter(s=>v62Shift(k,s.id)?.start===st);
+    while(same.length>2){
+      let s=same.pop();
+      let old=v62Shift(k,s.id);
+      let moved=false;
+      for(let ns of [st-1,st+1,st-2,st+2,st-3,st+3]){
+        if(ns<=9||ns>=old.end) continue;
+        if(v69StartCount(k,ns,role)>=2) continue;
+        if(v69CanExtend(s,d,ns,old.end) && !v62WouldRunBad(s.id,k,ns,old.end)){
+          schedule[k][s.id]={label:String(ns),start:ns,end:old.end};
+          moved=true; break;
+        }
+      }
+      if(!moved) break;
+    }
+  }
+}
+function v69ValidateDay(k,d,role='ホール'){
+  return v62Blocks(d).every(n=>v62Head(k,n.a,n.b,role)>=n.min)
+    && !v68AnyEmployeeCoverMissing(k,d,role)
+    && v62CloseOk(k,d,role)
+    && v62Pool(role).filter(s=>v62Shift(k,s.id)?.start===9).length===1;
+}
+function v62AutoMake(role='ホール'){
+  role=role||'ホール';
+  let pool=v62Pool(role);
+  dates.forEach(d=>{let k=ymd(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id]);});
+  if(role!=='ホール'){quickSave();renderAll();alert('調理場は必要人数ルール未設定のため、今は自動生成していません');return;}
+
+  window.v69EmployeeOffPlan=v69EmpOffPlan(role);
+  window.v65EmployeeOffPlan=window.v69EmployeeOffPlan;
+
+  dates.forEach(d=>{
+    let k=ymd(d);
+    let dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v69EmpOffLocked(s,k));
+
+    v69NormalizeSetup(k,d,role);
+    v69ScheduleEmployeeWorkDays(k,d,role);
+
+    // 11時以降、全ブロックで社員1人
+    for(let b of v68OpenBlocksNoSetup(d)){
+      v69EnsureEmployeeBlock(k,d,b[0],b[1],role);
+    }
+
+    v69EnsureClosing(k,d,dayPool,role);
+    v69EnsureMinimums(k,d,dayPool,role);
+
+    // 育成枠は開始時刻制限を守れる時だけ+1
+    let total=Object.keys(schedule[k]||{}).filter(id=>pool.some(s=>s.id===id)).length;
+    let dayLimit=v62Weekend(d)?9:8;
+    for(let n of v62Blocks(d)){
+      if(total>=dayLimit) break;
+      let strong=pool.filter(s=>v62Covers(k,s.id,n.a,n.b)&&v62Rank(s)>=4).length;
+      if(strong<2 || v62Head(k,n.a,n.b,role)>=n.max+1) continue;
+      let pats=v62Weekend(d)?[[11,16,160],[11,18,150],[16,23,150],[17,23,140],[18,23,120]]
+                             :[[11,16,150],[11,17,150],[17,22,140],[18,22,120]];
+      pats=pats.filter(p=>p[0]<n.b&&p[1]>n.a);
+      let pick=v69TryAdd(k,d,dayPool,s=>v62Training(s)||s.category==='バイト 学生',pats,false,role);
+      if(pick) total++;
+    }
+
+    v69SpreadStarts(k,d,role);
+    v69NormalizeSetup(k,d,role);
+  });
+
+  // 最終補修。社員8休みは崩さず、勤務予定社員だけで社員不在を直す
+  dates.forEach(d=>{
+    let k=ymd(d), dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v69EmpOffLocked(s,k));
+    for(let b of v68OpenBlocksNoSetup(d)) v69EnsureEmployeeBlock(k,d,b[0],b[1],role);
+    v69EnsureClosing(k,d,dayPool,role);
+    v69EnsureMinimums(k,d,dayPool,role);
+    v69SpreadStarts(k,d,role);
+    v69NormalizeSetup(k,d,role);
+  });
+
+  quickSave(); renderAll();
+  let issues=validateCoreRulesV50(role);
+  alert(issues.length?`ホールの自動生成をしました\n確認が必要な項目：${issues.length}件`:'ホールの自動生成をしました');
+}
+// ===== /v69 =====
+
 function renderAll(){updateTabs();renderReq();renderMonth();renderDay();renderHours()}
 makeDates();loadData();renderAll();
 </script>
