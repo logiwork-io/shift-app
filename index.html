@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v69</title>
+<title>1人管理用シフト生成アプリ v70</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -191,6 +191,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 .cat-社員{background:#eaf7ff!important}
 .cat-バイト早番{background:#fff7df!important}
 .cat-バイトフリー{background:#edf7f2!important}
+.cat-バイト遅番{background:#fff0ea!important}
 .cat-バイト学生{background:#f5eeff!important}
 .catBadge{display:inline-block;border-radius:999px;padding:2px 6px;font-size:10px;background:#eef6f6;color:#345}
 .otherModeNote{font-size:10px;color:var(--m);margin-top:2px}
@@ -213,7 +214,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v69</h1><div class="sub">警告補修強化・社員8休み固定・イベント□表示版</div></header>
+<header><h1>1人管理用シフト生成アプリ v70</h1><div class="sub">v69最新版ベース・固定時間/平等配分/設定整理版</div></header>
 
 <main>
 <section class="card">
@@ -226,11 +227,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
     </select>
     <button class="sec" onclick="saveData()">保存</button>
     <button class="sec" onclick="resetData()">初期化</button>
-    <button class="soft" onclick="exportData()">データをコピー用に出す</button>
-    <button class="soft" onclick="importData()">貼り付けたデータを読み込む</button>
   </div>
-  <textarea id="dataTransfer" class="dataBox" placeholder="ここにコピー用データが出ます。別端末や次の版では、ここに貼り付けて読み込みできます。"></textarea>
-  <div class="copyNote">スタッフ設定・希望休・イベント・月間シフト・実績をまとめて移せます。</div>
   <p class="note">スタッフ詳細配置・詳細画面並び最終調整版です。次は自動生成ルール調整に進めます。</p>
 </section>
 
@@ -269,7 +266,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 
 <section id="pStaff" class="card hide">
   <h2>スタッフ設定</h2>
-  <p class="note">↑↓で並び順を変更できます。この順番が全体に反映されます。</p>
+  <p class="note">↑↓で並び順を変更できます。この順番が全体に反映されます。詳細変更後は【決定】で閉じます。</p>
   <div class="row"><button onclick="addStaff()">スタッフ追加</button><button class="sec" onclick="saveData()">保存</button></div>
   
   <div id="staffList"></div>
@@ -288,7 +285,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v69_single_manager';
+const storeKey='shift_v70_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -307,7 +304,7 @@ let staff=[
 {id:'o',name:'o',input:'work',role:'ホール',employment:'バイト',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',weekend:true,half:true,close:false,set:false,max:5},
 {id:'p',name:'p',input:'work',role:'ホール',employment:'バイト',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',weekend:true,half:true,close:false,set:false,max:5}
 ];
-let dates=[],requests={},schedule={},actual={},events={},view={input:'ホール',month:'ホール',day:'ホール'},staffView='ホール',editing=null;
+let dates=[],requests={},schedule={},actual={},events={},eventAttend={},view={input:'ホール',month:'ホール',day:'ホール'},staffView='ホール',editing=null;
 const H=[9,10,11,12,13,14,15,16,17,18,19], skills=['セッティング','レジ締め','ドリバ','ドリバ締め','仕込み','串打ち','鉄板','新人'];
 const patWeek=[['9',9,13],['9',9,15],['9',9,17],['9',9,18],['11',11,15],['11',11,17],['11',11,18],['11',11,20],['13',13,17],['13',13,20],['13',13,22],['15',15,20],['15',15,22],['17',17,20],['17',17,22],['18',18,22]];
 const patEnd=[['9',9,13],['9',9,15],['9',9,17],['9',9,18],['11',11,15],['11',11,18],['11',11,20],['13',13,18],['13',13,20],['15',15,20],['15',15,23],['17',17,20],['17',17,23],['18',18,23]];
@@ -333,10 +330,14 @@ function canHelpKitchenAt(s,p){
 }
 
 function staffCategory(s){
-  if(s.category) return s.category;
+  // v70: 区分を廃止し、雇用形態だけで分類する
+  const allowed=['社員','バイト 早番','バイト 遅番','バイト フリー','バイト 学生'];
+  if(allowed.includes(s.employment)) return s.employment;
+  if(s.category && allowed.includes(s.category)) return s.category;
   if(s.employment==='社員') return '社員';
   if(s.input==='work') return 'バイト 学生';
   if(Number(s.bs)<=11) return 'バイト 早番';
+  if(Number(s.bs)>=15) return 'バイト 遅番';
   return 'バイト フリー';
 }
 function catClass(s){return 'cat-'+staffCategory(s).replace(/\s/g,'')}
@@ -367,7 +368,8 @@ function applyDataObject(d){
     if(s.os===undefined) s.os='';
     if(s.oe===undefined) s.oe='';
     if(s.weekend===undefined) s.weekend = (s.noWeekend?false:true);
-    if(s.category===undefined) s.category=staffCategory(s);
+    s.employment=staffCategory(s);
+    s.category=s.employment;
     if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
     if(s.mainMode===undefined) s.mainMode='フリー';
     if(s.mainMode==='固定') s.mainMode='時間固定';
@@ -1577,6 +1579,28 @@ function v62WouldRunBad(id,k,st=11,en=12){
   if(old) schedule[k][id]=old; else v62Remove(k,id);
   return bad;
 }
+// v70: 最大連勤日数はスタッフ詳細の「最大連勤日数」を使う
+function v70RunBad(id){
+  let s=staff.find(x=>x.id===id);
+  let max=Number(s?.max||5);
+  let run=0;
+  for(let d of dates){
+    let k=v62Key(d);
+    if(v62Works(k,id)){run++; if(run>max)return true;}
+    else run=0;
+  }
+  return false;
+}
+function v70WouldRunBad(id,k,st=11,en=12){
+  let old=v62Shift(k,id);
+  if(!old) schedule[k]??={},schedule[k][id]={label:String(st),start:st,end:en};
+  let bad=v70RunBad(id);
+  if(old) schedule[k][id]=old; else v62Remove(k,id);
+  return bad;
+}
+function v62RunBad(id){return v70RunBad(id)}
+function v62WouldRunBad(id,k,st=11,en=12){return v70WouldRunBad(id,k,st,en)}
+
 function v62WorkDays(id){return dates.filter(d=>v62Works(v62Key(d),id)).length}
 function v62OffDays(id){return dates.length-v62WorkDays(id)}
 function v62SetupSkill(s){return v62Skill(s,'セッティング')||s.set===true}
@@ -2365,6 +2389,8 @@ function v68CanShift(s,d,st,en,allowOther=false){
   if(v62Weekend(d)&&s.weekend===false) return false;
   if(en-st>9) return false;
   if(s.employment==='社員'&&(en-st<7||en-st>9)) return false;
+  // v70: 時間固定は完全固定。その他時間や不足補填でも勝手にずらさない。
+  if(v68MainMode(s)==='時間固定') return Number(s.bs)===st && Number(s.be)===en;
   if(v68InMain(s,st,en)) return true;
   if(allowOther&&v62InOther(s,d,st,en)) return true;
   return false;
@@ -2612,7 +2638,7 @@ function validateCoreRulesV50(role='ホール'){
     let run=0;
     dates.forEach(d=>{
       let k=ymd(d);
-      if(schedule[k]?.[s.id]){ run++; if(run>=6) issues.push(`${s.name}: 6連勤`); }
+      if(schedule[k]?.[s.id]){ run++; if(run>Number(s.max||5)) issues.push(`${s.name}: 最大連勤日数超過`); }
       else run=0;
     });
   });
@@ -2836,13 +2862,20 @@ function openDetail(id){
   if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
   if(s.mainMode===undefined) s.mainMode='フリー';
   if(s.employment===undefined) s.employment = s.category==='社員' ? '社員' : 'バイト';
-  if(s.category===undefined) s.category=staffCategory(s);
+  s.employment=staffCategory(s);
+    s.category=s.employment;
   detailTitle.textContent=s.name+' 詳細';
   detailBody.innerHTML=`
   <div class="detailFormV19">
     <div class="wide"><label>スタッフ名</label><input value="${s.name}" onchange="setStaff('name',this.value)"></div>
-    <div><label>雇用形態</label><select onchange="setStaff('employment',this.value)"><option ${s.employment==='社員'?'selected':''}>社員</option><option ${s.employment==='バイト'?'selected':''}>バイト</option></select></div>
-    <div><label>区分</label><select onchange="setStaff('category',this.value)"><option ${staffCategory(s)==='社員'?'selected':''}>社員</option><option ${staffCategory(s)==='バイト 早番'?'selected':''}>バイト 早番</option><option ${staffCategory(s)==='バイト フリー'?'selected':''}>バイト フリー</option><option ${staffCategory(s)==='バイト 学生'?'selected':''}>バイト 学生</option></select></div>
+    <div><label>雇用形態</label><select onchange="setStaff('employment',this.value);setStaff('category',this.value)">
+      <option ${staffCategory(s)==='社員'?'selected':''}>社員</option>
+      <option ${staffCategory(s)==='バイト 早番'?'selected':''}>バイト 早番</option>
+      <option ${staffCategory(s)==='バイト 遅番'?'selected':''}>バイト 遅番</option>
+      <option ${staffCategory(s)==='バイト フリー'?'selected':''}>バイト フリー</option>
+      <option ${staffCategory(s)==='バイト 学生'?'selected':''}>バイト 学生</option>
+    </select></div>
+    <div><label>最大連勤日数</label><select onchange="setStaff('max',Number(this.value))"><option ${Number(s.max||5)===1?'selected':''}>1</option><option ${Number(s.max||5)===2?'selected':''}>2</option><option ${Number(s.max||5)===3?'selected':''}>3</option><option ${Number(s.max||5)===4?'selected':''}>4</option><option ${Number(s.max||5)===5?'selected':''}>5</option><option ${Number(s.max||5)===6?'selected':''}>6</option></select></div>
     <div><label>入力型</label><select onchange="setStaff('input',this.value)"><option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option><option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option></select></div>
     <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
     <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
@@ -2865,12 +2898,12 @@ function openDetail(id){
     <label><input type="checkbox" ${s.skills?.includes('鉄板')?'checked':''} onchange="toggleSkill('鉄板',this.checked)"> 鉄板</label>
     <label><input type="checkbox" ${s.skills?.includes('新人')?'checked':''} onchange="toggleSkill('新人',this.checked)"> 新人</label>
   </div>
-  <div class="row" style="margin-top:12px"><button class="sec" onclick="closeDetail()">戻る</button><button class="danger" onclick="deleteStaff('${s.id}')">削除</button></div>`;
+  <div class="row" style="margin-top:12px"><button onclick="confirmStaffDetail()">決定</button><button class="sec" onclick="closeDetail()">戻る</button><button class="danger" onclick="deleteStaff('${s.id}')">削除</button></div>`;
   detailModal.classList.remove('hide');
 }
 function timeOpts(cur,a,b){let out='';for(let h=a;h<=b;h++)out+=`<option value="${h}" ${Number(cur)===h?'selected':''}>${h}:00</option>`;return out}
 function timeOptsWithNone(cur,a,b){let out=`<option value="" ${cur===''||cur===undefined?'selected':''}>時間のみ</option>`;for(let h=a;h<=b;h++)out+=`<option value="${h}" ${String(cur)===String(h)?'selected':''}>${h}:00</option>`;return out}
-function setStaff(key,val){let s=staff.find(x=>x.id===editing);s[key]=val;quickSave();openDetail(editing);renderAll();renderStaff()}
+function setStaff(key,val){let s=staff.find(x=>x.id===editing);s[key]=val;if(key==='employment'){s.category=val;}quickSave();openDetail(editing);renderAll();renderStaff()}
 function toggleSkill(skill,on){
   let s=staff.find(x=>x.id===editing);s.skills??=[];
   if(on&&!s.skills.includes(skill))s.skills.push(skill);
@@ -2878,6 +2911,12 @@ function toggleSkill(skill,on){
   if(skill==='セッティング')s.set=on;
   if(skill==='レジ締め'||skill==='ドリバ締め')s.close=on||s.close;
   quickSave();openDetail(editing);renderAll();
+}
+
+function confirmStaffDetail(){
+  quickSave();
+  closeDetail();
+  alert('設定を反映しました');
 }
 function closeDetail(){detailModal.classList.add('hide');editing=null;renderStaff();renderAll()}
 function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
@@ -3019,6 +3058,15 @@ function v69CanPlace(k,s,d,st,en,allowOther=false,role='ホール'){
   return v68CanShift(s,d,st,en,allowOther);
 }
 function v69Assign(k,s,st,en){v62Assign(k,s,st,en);return true;}
+
+function v70BalanceScore(s){
+  // 同じ担当・雇用形態・メイン時間・固定種別の人は、月予定時間が少ない人を優先
+  let group=staff.filter(x=>x.role===s.role && staffCategory(x)===staffCategory(s) && Number(x.bs)===Number(s.bs) && Number(x.be)===Number(s.be) && v68MainMode(x)===v68MainMode(s));
+  if(group.length<2) return 0;
+  let own=plannedHoursFor(s.id);
+  let min=Math.min(...group.map(x=>plannedHoursFor(x.id)));
+  return Math.max(0,min+9-own)*18;
+}
 function v69TryAdd(k,d,pool,filter,patterns,allowOther=false,role='ホール'){
   let c=[];
   for(let s of pool.filter(filter)){
@@ -3027,7 +3075,7 @@ function v69TryAdd(k,d,pool,filter,patterns,allowOther=false,role='ホール'){
       let st=p[0], en=p[1], score=p[2]||0;
       if(en<=st) continue;
       if(v69CanPlace(k,s,d,st,en,allowOther,role)){
-        c.push({s,st,en,score:score+v62ScoreBase(s)+(allowOther?-90:0)-(v69StartCount(k,st,role)*80)});
+        c.push({s,st,en,score:score+v62ScoreBase(s)+v70BalanceScore(s)+(allowOther?-90:0)-(v69StartCount(k,st,role)*80)});
       }
     }
   }
@@ -3244,7 +3292,7 @@ function v62AutoMake(role='ホール'){
 }
 // ===== /v69 =====
 
-function renderAll(){updateTabs();renderReq();renderMonth();renderDay();renderHours()}
+function renderAll(){staff.forEach(s=>{if(s.max===undefined)s.max=5;s.employment=staffCategory(s);s.category=s.employment;});updateTabs();renderReq();renderMonth();renderDay();renderHours()}
 makeDates();loadData();renderAll();
 </script>
 </body>
