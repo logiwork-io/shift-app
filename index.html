@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v70</title>
+<title>1人管理用シフト生成アプリ v74</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -190,8 +190,8 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 
 .cat-社員{background:#eaf7ff!important}
 .cat-バイト早番{background:#fff7df!important}
+.cat-バイト遅番{background:#fff0e8!important}
 .cat-バイトフリー{background:#edf7f2!important}
-.cat-バイト遅番{background:#fff0ea!important}
 .cat-バイト学生{background:#f5eeff!important}
 .catBadge{display:inline-block;border-radius:999px;padding:2px 6px;font-size:10px;background:#eef6f6;color:#345}
 .otherModeNote{font-size:10px;color:var(--m);margin-top:2px}
@@ -214,7 +214,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v70</h1><div class="sub">v69最新版ベース・固定時間/平等配分/設定整理版</div></header>
+<header><h1>1人管理用シフト生成アプリ v74</h1><div class="sub">設定/希望休 個別引継ぎ版</div></header>
 
 <main>
 <section class="card">
@@ -228,7 +228,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
     <button class="sec" onclick="saveData()">保存</button>
     <button class="sec" onclick="resetData()">初期化</button>
   </div>
-  <p class="note">スタッフ詳細配置・詳細画面並び最終調整版です。次は自動生成ルール調整に進めます。</p>
+  <p class="note">試作期間中は、設定ページと希望入力ページの引継ぎ欄から必要なデータだけコピペで移せます。</p>
 </section>
 
 <section id="pInput" class="card">
@@ -236,6 +236,14 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
   <div class="seg"><button id="inputHall" onclick="setView('input','ホール')">ホール</button><button id="inputKitchen" class="sec" onclick="setView('input','調理場')">調理場</button></div>
   <div class="row"><button class="soft" onclick="sampleReq()">サンプル入力</button><button onclick="autoMake(view.input)">自動生成</button><button class="sec" onclick="showPanel('Month')">月間を見る</button></div>
   <p class="note">希望休を入力：×=休み、空欄=出勤可能。出勤を入力：○=出勤可能、空欄=休み希望。</p>
+  <div class="box" style="margin:10px 0">
+    <div class="row">
+      <button class="soft" onclick="exportRequestsData()">希望休書き出し</button>
+      <button class="soft" onclick="importRequestsData()">希望休呼び出し</button>
+    </div>
+    <textarea id="requestTransfer" class="dataBox" placeholder="ここに希望休・有給・イベント参加データを書き出します。呼び出す時はここに貼り付けます。"></textarea>
+    <div class="copyNote">希望入力ページ用。スタッフ設定は含めず、希望休/出勤可否/有給/イベント参加/イベント欄だけを引き継ぎます。</div>
+  </div>
   <div class="tw reqwrap"><table id="reqTable"></table></div>
 </section>
 
@@ -266,8 +274,16 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 
 <section id="pStaff" class="card hide">
   <h2>スタッフ設定</h2>
-  <p class="note">↑↓で並び順を変更できます。この順番が全体に反映されます。詳細変更後は【決定】で閉じます。</p>
+  <p class="note">↑↓で並び順を変更できます。この順番が全体に反映されます。</p>
   <div class="row"><button onclick="addStaff()">スタッフ追加</button><button class="sec" onclick="saveData()">保存</button></div>
+  <div class="box" style="margin:10px 0">
+    <div class="row">
+      <button class="soft" onclick="exportSettingsData()">設定書き出し</button>
+      <button class="soft" onclick="importSettingsData()">設定呼び出し</button>
+    </div>
+    <textarea id="settingsTransfer" class="dataBox" placeholder="ここにスタッフ設定を書き出します。呼び出す時はここに貼り付けます。"></textarea>
+    <div class="copyNote">設定ページ用。スタッフ名・雇用形態・メイン時間・固定設定・最大連勤・ランク・スキルなどを引き継ぎます。</div>
+  </div>
   
   <div id="staffList"></div>
 </section>
@@ -285,7 +301,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="preview" class="modal hide"><div class="inner"><div class="mh"><div><b>月間シフト プレビュー</b><div class="note">月間で選んでいるホール/調理場だけ表示します。</div></div><div class="row"><button onclick="window.print()">印刷</button><button class="sec" onclick="closePreview()">閉じる</button></div></div><div id="sheet" class="print"></div></div></div>
 
 <script>
-const storeKey='shift_v70_single_manager';
+const storeKey='shift_v73_single_manager';
 let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
@@ -330,10 +346,9 @@ function canHelpKitchenAt(s,p){
 }
 
 function staffCategory(s){
-  // v70: 区分を廃止し、雇用形態だけで分類する
-  const allowed=['社員','バイト 早番','バイト 遅番','バイト フリー','バイト 学生'];
-  if(allowed.includes(s.employment)) return s.employment;
-  if(s.category && allowed.includes(s.category)) return s.category;
+  const valid=['社員','バイト 早番','バイト 遅番','バイト フリー','バイト 学生'];
+  if(valid.includes(s.employment)) return s.employment;
+  if(valid.includes(s.category)) return s.category;
   if(s.employment==='社員') return '社員';
   if(s.input==='work') return 'バイト 学生';
   if(Number(s.bs)<=11) return 'バイト 早番';
@@ -368,8 +383,10 @@ function applyDataObject(d){
     if(s.os===undefined) s.os='';
     if(s.oe===undefined) s.oe='';
     if(s.weekend===undefined) s.weekend = (s.noWeekend?false:true);
-    s.employment=staffCategory(s);
-    s.category=s.employment;
+    const cat=staffCategory(s);
+    s.employment=cat;
+    s.category=cat;
+    if(s.max===undefined) s.max=5;
     if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
     if(s.mainMode===undefined) s.mainMode='フリー';
     if(s.mainMode==='固定') s.mainMode='時間固定';
@@ -397,22 +414,91 @@ function saveData(){
 }
 function quickSave(){localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}))}
 
+function exportSettingsData(){
+  try{
+    quickSave();
+    let data={type:'settingsOnly', staff};
+    let encoded=JSON.stringify(data);
+    settingsTransfer.value=encoded;
+    settingsTransfer.focus();
+    settingsTransfer.select();
+    navigator.clipboard?.writeText(encoded).then(()=>alert('設定を書き出してコピーしました')).catch(()=>alert('設定を書き出しました。長押しでコピーしてください'));
+  }catch(e){
+    alert('設定引継ぎデータ作成に失敗しました');
+  }
+}
+function importSettingsData(){
+  try{
+    let raw=(settingsTransfer.value||'').trim();
+    if(!raw){alert('呼び出す設定データを貼り付けてください');return;}
+    let d=JSON.parse(raw);
+    if(!d.staff){alert('スタッフ設定データが見つかりません');return;}
+    staff=d.staff;
+    staff.forEach(s=>{
+      if(s.os===undefined) s.os='';
+      if(s.oe===undefined) s.oe='';
+      if(s.weekend===undefined) s.weekend=(s.noWeekend?false:true);
+      if(s.category===undefined) s.category=staffCategory(s);
+      if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
+      if(s.mainMode===undefined) s.mainMode='フリー';
+      if(s.mainMode==='固定') s.mainMode='時間固定';
+      if(s.max===undefined) s.max=5;
+    });
+    quickSave();
+    renderAll();
+    alert('スタッフ設定を読み込みました');
+  }catch(e){
+    alert('設定データの読み込みに失敗しました。コピー内容を確認してください');
+  }
+}
+
+function exportRequestsData(){
+  try{
+    quickSave();
+    let data={type:'requestsOnly', requests, events, eventAttend, month:month.value};
+    let encoded=JSON.stringify(data);
+    requestTransfer.value=encoded;
+    requestTransfer.focus();
+    requestTransfer.select();
+    navigator.clipboard?.writeText(encoded).then(()=>alert('希望休を書き出してコピーしました')).catch(()=>alert('希望休を書き出しました。長押しでコピーしてください'));
+  }catch(e){
+    alert('希望休データ作成に失敗しました');
+  }
+}
+function importRequestsData(){
+  try{
+    let raw=(requestTransfer.value||'').trim();
+    if(!raw){alert('呼び出す希望休データを貼り付けてください');return;}
+    let d=JSON.parse(raw);
+    requests=d.requests||{};
+    events=d.events||{};
+    eventAttend=d.eventAttend||{};
+    quickSave();
+    renderAll();
+    alert('希望休を呼び出しました');
+  }catch(e){
+    alert('希望休データの呼び出しに失敗しました。コピー内容を確認してください');
+  }
+}
+
 function exportData(){
   try{
     quickSave();
     let data={staff,requests,schedule,actual,events,eventAttend};
     let encoded=JSON.stringify(data);
-    dataTransfer.value=encoded;
-    dataTransfer.focus();
-    dataTransfer.select();
-    navigator.clipboard?.writeText(encoded).then(()=>alert('コピー用データを作成してコピーしました')).catch(()=>alert('コピー用データを作成しました。長押しでコピーしてください'));
+    let box=document.getElementById('settingsTransfer')||document.getElementById('requestTransfer');
+    box.value=encoded;
+    box.focus();
+    box.select();
+    navigator.clipboard?.writeText(encoded).then(()=>alert('引継ぎ用データを作成してコピーしました')).catch(()=>alert('引継ぎ用データを作成しました。長押しでコピーしてください'));
   }catch(e){
-    alert('データ作成に失敗しました');
+    alert('引継ぎデータ作成に失敗しました');
   }
 }
 function importData(){
   try{
-    let raw=(dataTransfer.value||'').trim();
+    let box=document.getElementById('settingsTransfer')||document.getElementById('requestTransfer');
+    let raw=(box.value||'').trim();
     if(!raw){alert('読み込むデータを貼り付けてください');return;}
     let d=JSON.parse(raw);
     applyDataObject(d);
@@ -1565,9 +1651,11 @@ function v62Power(k,a,b,role='ホール'){return v62Pool(role).filter(s=>v62Cove
 function v62Works(k,id){return !!v62Shift(k,id)}
 function v62RunBad(id){
   let run=0;
+  let s=staff.find(x=>x.id===id);
+  let mx=Number(s?.max||5);
   for(let d of dates){
     let k=v62Key(d);
-    if(v62Works(k,id)){run++; if(run>=6)return true}
+    if(v62Works(k,id)){run++; if(run>mx)return true}
     else run=0;
   }
   return false;
@@ -1579,28 +1667,6 @@ function v62WouldRunBad(id,k,st=11,en=12){
   if(old) schedule[k][id]=old; else v62Remove(k,id);
   return bad;
 }
-// v70: 最大連勤日数はスタッフ詳細の「最大連勤日数」を使う
-function v70RunBad(id){
-  let s=staff.find(x=>x.id===id);
-  let max=Number(s?.max||5);
-  let run=0;
-  for(let d of dates){
-    let k=v62Key(d);
-    if(v62Works(k,id)){run++; if(run>max)return true;}
-    else run=0;
-  }
-  return false;
-}
-function v70WouldRunBad(id,k,st=11,en=12){
-  let old=v62Shift(k,id);
-  if(!old) schedule[k]??={},schedule[k][id]={label:String(st),start:st,end:en};
-  let bad=v70RunBad(id);
-  if(old) schedule[k][id]=old; else v62Remove(k,id);
-  return bad;
-}
-function v62RunBad(id){return v70RunBad(id)}
-function v62WouldRunBad(id,k,st=11,en=12){return v70WouldRunBad(id,k,st,en)}
-
 function v62WorkDays(id){return dates.filter(d=>v62Works(v62Key(d),id)).length}
 function v62OffDays(id){return dates.length-v62WorkDays(id)}
 function v62SetupSkill(s){return v62Skill(s,'セッティング')||s.set===true}
@@ -2389,9 +2455,9 @@ function v68CanShift(s,d,st,en,allowOther=false){
   if(v62Weekend(d)&&s.weekend===false) return false;
   if(en-st>9) return false;
   if(s.employment==='社員'&&(en-st<7||en-st>9)) return false;
-  // v70: 時間固定は完全固定。その他時間や不足補填でも勝手にずらさない。
-  if(v68MainMode(s)==='時間固定') return Number(s.bs)===st && Number(s.be)===en;
   if(v68InMain(s,st,en)) return true;
+  // 時間固定は完全固定。その他時間・最終手段でも崩さない。
+  if(v68MainMode(s)==='時間固定') return false;
   if(allowOther&&v62InOther(s,d,st,en)) return true;
   return false;
 }
@@ -2638,7 +2704,7 @@ function validateCoreRulesV50(role='ホール'){
     let run=0;
     dates.forEach(d=>{
       let k=ymd(d);
-      if(schedule[k]?.[s.id]){ run++; if(run>Number(s.max||5)) issues.push(`${s.name}: 最大連勤日数超過`); }
+      if(schedule[k]?.[s.id]){ run++; if(run>Number(s.max||5)) issues.push(`${s.name}: 最大連勤${s.max||5}日超え`); }
       else run=0;
     });
   });
@@ -2861,21 +2927,22 @@ function openDetail(id){
   if(s.weekend===undefined) s.weekend=true;
   if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
   if(s.mainMode===undefined) s.mainMode='フリー';
-  if(s.employment===undefined) s.employment = s.category==='社員' ? '社員' : 'バイト';
-  s.employment=staffCategory(s);
-    s.category=s.employment;
+  if(s.employment===undefined || s.employment==='バイト') s.employment = staffCategory(s);
+  s.category=s.employment;
   detailTitle.textContent=s.name+' 詳細';
   detailBody.innerHTML=`
   <div class="detailFormV19">
     <div class="wide"><label>スタッフ名</label><input value="${s.name}" onchange="setStaff('name',this.value)"></div>
-    <div><label>雇用形態</label><select onchange="setStaff('employment',this.value);setStaff('category',this.value)">
+    <div><label>雇用形態</label><select onchange="setStaff('employment',this.value)">
       <option ${staffCategory(s)==='社員'?'selected':''}>社員</option>
       <option ${staffCategory(s)==='バイト 早番'?'selected':''}>バイト 早番</option>
       <option ${staffCategory(s)==='バイト 遅番'?'selected':''}>バイト 遅番</option>
       <option ${staffCategory(s)==='バイト フリー'?'selected':''}>バイト フリー</option>
       <option ${staffCategory(s)==='バイト 学生'?'selected':''}>バイト 学生</option>
     </select></div>
-    <div><label>最大連勤日数</label><select onchange="setStaff('max',Number(this.value))"><option ${Number(s.max||5)===1?'selected':''}>1</option><option ${Number(s.max||5)===2?'selected':''}>2</option><option ${Number(s.max||5)===3?'selected':''}>3</option><option ${Number(s.max||5)===4?'selected':''}>4</option><option ${Number(s.max||5)===5?'selected':''}>5</option><option ${Number(s.max||5)===6?'selected':''}>6</option></select></div>
+    <div><label>最大連勤日数</label><select onchange="setStaff('max',Number(this.value))">
+      ${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${Number(s.max||5)===n?'selected':''}>${n}日</option>`).join('')}
+    </select></div>
     <div><label>入力型</label><select onchange="setStaff('input',this.value)"><option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option><option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option></select></div>
     <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
     <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
@@ -2898,12 +2965,19 @@ function openDetail(id){
     <label><input type="checkbox" ${s.skills?.includes('鉄板')?'checked':''} onchange="toggleSkill('鉄板',this.checked)"> 鉄板</label>
     <label><input type="checkbox" ${s.skills?.includes('新人')?'checked':''} onchange="toggleSkill('新人',this.checked)"> 新人</label>
   </div>
-  <div class="row" style="margin-top:12px"><button onclick="confirmStaffDetail()">決定</button><button class="sec" onclick="closeDetail()">戻る</button><button class="danger" onclick="deleteStaff('${s.id}')">削除</button></div>`;
+  <div class="row" style="margin-top:12px"><button onclick="confirmDetail()">決定</button><button class="sec" onclick="closeDetail()">閉じる</button><button class="danger" onclick="deleteStaff('${s.id}')">削除</button></div>`;
   detailModal.classList.remove('hide');
 }
 function timeOpts(cur,a,b){let out='';for(let h=a;h<=b;h++)out+=`<option value="${h}" ${Number(cur)===h?'selected':''}>${h}:00</option>`;return out}
 function timeOptsWithNone(cur,a,b){let out=`<option value="" ${cur===''||cur===undefined?'selected':''}>時間のみ</option>`;for(let h=a;h<=b;h++)out+=`<option value="${h}" ${String(cur)===String(h)?'selected':''}>${h}:00</option>`;return out}
-function setStaff(key,val){let s=staff.find(x=>x.id===editing);s[key]=val;if(key==='employment'){s.category=val;}quickSave();openDetail(editing);renderAll();renderStaff()}
+function setStaff(key,val){
+  let s=staff.find(x=>x.id===editing);
+  s[key]=val;
+  if(key==='employment'){s.category=val;}
+  if(key==='category'){s.employment=val;}
+  quickSave();openDetail(editing);renderAll();renderStaff();
+}
+function confirmDetail(){quickSave();alert('設定を反映しました');closeDetail();}
 function toggleSkill(skill,on){
   let s=staff.find(x=>x.id===editing);s.skills??=[];
   if(on&&!s.skills.includes(skill))s.skills.push(skill);
@@ -2912,14 +2986,8 @@ function toggleSkill(skill,on){
   if(skill==='レジ締め'||skill==='ドリバ締め')s.close=on||s.close;
   quickSave();openDetail(editing);renderAll();
 }
-
-function confirmStaffDetail(){
-  quickSave();
-  closeDetail();
-  alert('設定を反映しました');
-}
 function closeDetail(){detailModal.classList.add('hide');editing=null;renderStaff();renderAll()}
-function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
+function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト フリー',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
 function deleteStaff(id){if(confirm('削除しますか？')){staff=staff.filter(s=>s.id!==id);delete requests[id];Object.keys(schedule).forEach(k=>delete schedule[k][id]);delete actual[id];quickSave();closeDetail()}}
 function openPreview(){renderPreview();preview.classList.remove('hide')}
 function closePreview(){preview.classList.add('hide')}
@@ -3059,14 +3127,27 @@ function v69CanPlace(k,s,d,st,en,allowOther=false,role='ホール'){
 }
 function v69Assign(k,s,st,en){v62Assign(k,s,st,en);return true;}
 
-function v70BalanceScore(s){
-  // 同じ担当・雇用形態・メイン時間・固定種別の人は、月予定時間が少ない人を優先
-  let group=staff.filter(x=>x.role===s.role && staffCategory(x)===staffCategory(s) && Number(x.bs)===Number(s.bs) && Number(x.be)===Number(s.be) && v68MainMode(x)===v68MainMode(s));
-  if(group.length<2) return 0;
-  let own=plannedHoursFor(s.id);
-  let min=Math.min(...group.map(x=>plannedHoursFor(x.id)));
-  return Math.max(0,min+9-own)*18;
+function v70GroupKey(s){
+  return [staffCategory(s), v68MainMode(s), Number(s.bs)||'', Number(s.be)||''].join('|');
 }
+function v70MonthHoursUntil(s,k){
+  let total=0;
+  for(let d of dates){
+    let kk=ymd(d);
+    if(kk===k) break;
+    total += hoursOfShift(schedule[kk]?.[s.id]);
+  }
+  return total;
+}
+function v70FairnessScore(s,k){
+  let group=staff.filter(x=>x.role===s.role && v70GroupKey(x)===v70GroupKey(s));
+  if(group.length<=1) return 0;
+  let own=v70MonthHoursUntil(s,k);
+  let min=Math.min(...group.map(x=>v70MonthHoursUntil(x,k)));
+  let over=own-min;
+  return Math.max(-180, -over*14) + Math.max(0,(min+8-own))*6;
+}
+
 function v69TryAdd(k,d,pool,filter,patterns,allowOther=false,role='ホール'){
   let c=[];
   for(let s of pool.filter(filter)){
@@ -3075,7 +3156,7 @@ function v69TryAdd(k,d,pool,filter,patterns,allowOther=false,role='ホール'){
       let st=p[0], en=p[1], score=p[2]||0;
       if(en<=st) continue;
       if(v69CanPlace(k,s,d,st,en,allowOther,role)){
-        c.push({s,st,en,score:score+v62ScoreBase(s)+v70BalanceScore(s)+(allowOther?-90:0)-(v69StartCount(k,st,role)*80)});
+        c.push({s,st,en,score:score+v62ScoreBase(s)+v70FairnessScore(s,k)+(allowOther?-90:0)-(v69StartCount(k,st,role)*80)});
       }
     }
   }
@@ -3292,7 +3373,166 @@ function v62AutoMake(role='ホール'){
 }
 // ===== /v69 =====
 
-function renderAll(){staff.forEach(s=>{if(s.max===undefined)s.max=5;s.employment=staffCategory(s);s.category=s.employment;});updateTabs();renderReq();renderMonth();renderDay();renderHours()}
+// ===== v73 自動生成確認・補修パッチ =====
+function v73MaxConsecOk(id,k){
+  let keys=dates.map(d=>ymd(d));
+  let idx=keys.indexOf(k), s=staff.find(x=>x.id===id), max=Number(s?.max||5);
+  let run=0;
+  for(let i=0;i<keys.length;i++){
+    let work=!!schedule[keys[i]]?.[id] || i===idx;
+    if(work){run++; if(run>max) return false;} else run=0;
+  }
+  return true;
+}
+function v73AllowedShift(s,d,st,en,allowOther=true){
+  if(en<=st || en-st>9) return false;
+  if(s.employment==='社員' && (en-st<7 || en-st>9)) return false;
+  return v68CanShift(s,d,st,en,allowOther);
+}
+function v73CanAdd(k,s,d,st,en,role='ホール',allowOther=true){
+  if(schedule[k]?.[s.id]) return false;
+  if(st===9 && v62Pool(role).some(x=>schedule[k]?.[x.id]?.start===9)) return false;
+  if(st!==9 && v69StartCount(k,st,role)>=2) return false;
+  if(!v73MaxConsecOk(s.id,k)) return false;
+  return v73AllowedShift(s,d,st,en,allowOther);
+}
+function v73Add(k,s,st,en){schedule[k]??={};schedule[k][s.id]={label:String(st),start:st,end:en};}
+function v73PickAndAdd(k,d,pool,filter,patterns,role='ホール',allowOther=true,extraScoreFn=null){
+  let c=[];
+  for(let s of pool.filter(filter)){
+    for(let p of patterns){
+      let st=p[0], en=p[1], sc=p[2]||0;
+      if(v73CanAdd(k,s,d,st,en,role,allowOther)){
+        let fair=(typeof v70FairnessBonus==='function')?v70FairnessBonus(s,k):0;
+        c.push({s,st,en,score:sc+v62ScoreBase(s)+fair-(v69StartCount(k,st,role)*45)+(extraScoreFn?extraScoreFn(s,st,en):0)});
+      }
+    }
+  }
+  c.sort((a,b)=>b.score-a.score||v62Rank(b.s)-v62Rank(a.s)||a.st-b.st||b.en-a.en);
+  let x=c[0]; if(x){v73Add(k,x.s,x.st,x.en);return x;} return null;
+}
+function v73PlanEmployeeOffs(role='ホール'){
+  let emps=v62Pool(role).filter(s=>s.employment==='社員');
+  let plan={}; emps.forEach(s=>plan[s.id]=new Set());
+  let offCountByDay={}; dates.forEach(d=>offCountByDay[ymd(d)]=0);
+  emps.forEach(s=>dates.forEach(d=>{let k=ymd(d); if(reqObj(s.id,k).m==='×'&&!v69EventAttend(s,k)){plan[s.id].add(k);offCountByDay[k]++;}}));
+  function wouldRunBad(s,set){let run=0;for(let d of dates){let k=ymd(d);if(set.has(k)){run=0}else{run++; if(run>Number(s.max||5)) return true;}}return false;}
+  function canOff(s,k){if(plan[s.id].has(k)||v69EventAttend(s,k))return false; if(plan[s.id].size>=8)return false; if((offCountByDay[k]||0)>=Math.max(0,emps.length-1))return false; return true;}
+  emps.forEach((s,si)=>{
+    let guard=0;
+    while((plan[s.id].size<8 || wouldRunBad(s,plan[s.id])) && guard++<200){
+      let best=null;
+      dates.forEach((d,idx)=>{
+        let k=ymd(d); if(!canOff(s,k))return;
+        let tmp=new Set(plan[s.id]); tmp.add(k);
+        let score=100-(offCountByDay[k]||0)*40;
+        if(!wouldRunBad(s,tmp)) score+=300;
+        if(((idx+si)%4)===0) score+=30;
+        if((idx>0&&plan[s.id].has(ymd(dates[idx-1])))||(idx<dates.length-1&&plan[s.id].has(ymd(dates[idx+1])))) score-=50;
+        if(!best||score>best.score) best={k,score};
+      });
+      if(!best) break;
+      plan[s.id].add(best.k); offCountByDay[best.k]=(offCountByDay[best.k]||0)+1;
+    }
+  });
+  return plan;
+}
+function v73EmpOff(s,k){return s.employment==='社員' && window.v73EmployeeOffPlan?.[s.id]?.has(k) && !v69EventAttend(s,k);}
+function v73EmployeePatterns(s,d){
+  let close=v62Close(d), bs=Number(s.bs)||11, be=Number(s.be)||close, m=v68MainMode(s);
+  if(m==='時間固定') return [[bs,be,700]];
+  let raw=[];
+  if(bs<=11) raw=[[11,20,650],[11,19,500],[12,20,420],[10,19,200],[13,22,180],[14,23,160]];
+  else if(be>=close) raw=[[13,close,650],[14,close,610],[15,close,600],[16,close,520],[17,close,450],[11,20,260]];
+  else raw=[[bs,be,600],[13,22,500],[15,22,470],[11,20,420],[17,22,350]];
+  return raw.map(p=>[p[0],Math.min(p[1],close),p[2]]).filter(p=>p[1]-p[0]>=7&&p[1]>p[0]);
+}
+function v73EnsureSetup(k,d,dayPool,role='ホール'){
+  let current=v62Pool(role).filter(s=>schedule[k]?.[s.id]?.start===9);
+  if(current.length>1){let keep=current.find(v62SetupSkill)||current[0];current.forEach(s=>{if(s.id!==keep.id)delete schedule[k][s.id];});}
+  current=v62Pool(role).filter(s=>schedule[k]?.[s.id]?.start===9);
+  if(current.length===1&&v62SetupSkill(current[0])) return;
+  current.forEach(s=>delete schedule[k][s.id]);
+  v73PickAndAdd(k,d,dayPool,s=>v62SetupSkill(s)&&!v73EmpOff(s,k),[[9,13,900],[9,15,850],[9,17,500]],role,true,(s)=>-((window.v73SetupCounts?.[s.id]||0)*120));
+  let s=v62Pool(role).find(x=>schedule[k]?.[x.id]?.start===9); if(s){window.v73SetupCounts??={};window.v73SetupCounts[s.id]=(window.v73SetupCounts[s.id]||0)+1;}
+}
+function v73EnsureEmployeeCover(k,d,dayPool,role='ホール'){
+  let blocks=v68OpenBlocksNoSetup(d);
+  for(let b of blocks){
+    if(v68EmployeeCovers(k,d,b[0],b[1],role)) continue;
+    let emps=dayPool.filter(s=>s.employment==='社員'&&!v73EmpOff(s,k));
+    let fixed=false;
+    for(let s of emps){
+      let old=schedule[k]?.[s.id]; if(!old) continue;
+      let st=Math.min(old.start,b[0]), en=Math.max(old.end,b[1]);
+      if(en-st<=9&&v73AllowedShift(s,d,st,en,true)){schedule[k][s.id]={label:String(st),start:st,end:en}; fixed=true; break;}
+    }
+    if(fixed) continue;
+    let close=v62Close(d);
+    let pats=[[Math.max(11,b[0]),Math.min(close,Math.max(b[1],b[0]+8)),800],[11,20,650],[13,close,650],[15,close,600],[17,close,500]].filter(p=>p[1]>p[0]);
+    v73PickAndAdd(k,d,emps,s=>true,pats,role,true);
+  }
+}
+function v73EnsureClosing(k,d,dayPool,role='ホール'){
+  let close=v62Close(d), guard=0;
+  while(!v62CloseOk(k,d,role)&&guard++<10){
+    let closers=v62Closers(k,d,role);
+    if(!closers.some(s=>s.employment==='社員')) v73PickAndAdd(k,d,dayPool,s=>s.employment==='社員'&&!v73EmpOff(s,k),[[13,close,850],[15,close,830],[16,close,760],[17,close,700]],role,true);
+    else if(!closers.some(v62RegSkill)) v73PickAndAdd(k,d,dayPool,s=>v62RegSkill(s)&&!(s.employment==='社員'&&v73EmpOff(s,k)),[[13,close,820],[15,close,800],[16,close,760],[17,close,720],[18,close,680]],role,true);
+    else if(!closers.some(v62DrinkSkill)) v73PickAndAdd(k,d,dayPool,s=>v62DrinkSkill(s)&&!(s.employment==='社員'&&v73EmpOff(s,k)),[[16,close,850],[17,close,850],[18,close,760],[15,close,700],[13,close,600]],role,true);
+    else if(closers.length<3) v73PickAndAdd(k,d,dayPool,s=>!(s.employment==='社員'&&v73EmpOff(s,k)),[[16,close,700],[17,close,730],[18,close,690],[15,close,640],[13,close,550]],role,true);
+    else break;
+  }
+}
+function v73EnsureMinimum(k,d,dayPool,role='ホール'){
+  let close=v62Close(d);
+  for(let n of v62Blocks(d)){
+    let guard=0;
+    while(v62Head(k,n.a,n.b,role)<n.min && guard++<15){
+      let pats=v62Weekend(d)?[[11,16,600],[11,18,590],[12,18,540],[13,23,560],[14,23,550],[15,23,540],[16,23,520],[17,23,500],[18,23,430]]:[[11,16,600],[11,17,600],[12,17,540],[11,20,540],[13,22,530],[15,22,520],[16,22,500],[17,22,480],[18,22,420]];
+      pats=pats.map(p=>[p[0],Math.min(p[1],close),p[2]]).filter(p=>p[0]<n.b&&p[1]>n.a&&p[1]>p[0]);
+      if(!v73PickAndAdd(k,d,dayPool,s=>!(s.employment==='社員'&&v73EmpOff(s,k)),pats,role,true)) break;
+    }
+  }
+}
+function v73Spread(k,d,role='ホール'){
+  for(let st=10;st<=23;st++){
+    let over=v62Pool(role).filter(s=>schedule[k]?.[s.id]?.start===st);
+    while(over.length>2){
+      over.sort((a,b)=>(a.employment==='社員'?1:0)-(b.employment==='社員'?1:0)||v62Rank(a)-v62Rank(b));
+      let s=over.shift(), old=schedule[k]?.[s.id], moved=false; if(!old)break;
+      for(let ns of [st-1,st+1,st-2,st+2]){
+        if(ns<=9||ns>=old.end||v69StartCount(k,ns,role)>=2)continue;
+        if(v73AllowedShift(s,d,ns,old.end,true)){schedule[k][s.id]={label:String(ns),start:ns,end:old.end};moved=true;break;}
+      }
+      if(!moved)break;
+      over=v62Pool(role).filter(x=>schedule[k]?.[x.id]?.start===st);
+    }
+  }
+}
+function v73AutoMake(role='ホール'){
+  role=role||'ホール'; let pool=v62Pool(role);
+  dates.forEach(d=>{let k=ymd(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id]);});
+  if(role!=='ホール'){quickSave();renderAll();alert('調理場は必要人数ルール未設定のため、今は自動生成していません');return;}
+  window.v73EmployeeOffPlan=v73PlanEmployeeOffs(role); window.v69EmployeeOffPlan=window.v73EmployeeOffPlan; window.v65EmployeeOffPlan=window.v73EmployeeOffPlan; window.v73SetupCounts={};
+  dates.forEach(d=>{
+    let k=ymd(d); let dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));
+    v73EnsureSetup(k,d,dayPool,role);
+    dayPool.filter(s=>s.employment==='社員').sort((a,b)=>Number(a.bs)-Number(b.bs)||a.id.localeCompare(b.id)).forEach(s=>{
+      v73PickAndAdd(k,d,[s],x=>true,v73EmployeePatterns(s,d),role,true);
+    });
+    v73EnsureEmployeeCover(k,d,dayPool,role);
+    v73EnsureClosing(k,d,dayPool,role);
+    v73EnsureMinimum(k,d,dayPool,role);
+    v73Spread(k,d,role); v73EnsureSetup(k,d,dayPool,role);
+  });
+  dates.forEach(d=>{let k=ymd(d);let dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureEmployeeCover(k,d,dayPool,role);v73EnsureClosing(k,d,dayPool,role);v73EnsureMinimum(k,d,dayPool,role);v73Spread(k,d,role);v73EnsureSetup(k,d,dayPool,role);});
+  quickSave(); renderAll(); let issues=validateCoreRulesV50(role); alert(issues.length?`ホールの自動生成をしました\n確認が必要な項目：${issues.length}件`:'ホールの自動生成をしました');
+}
+function v62AutoMake(role){return v73AutoMake(role||view.month||'ホール');}
+// ===== /v73 =====
+
+function renderAll(){updateTabs();renderReq();renderMonth();renderDay();renderHours()}
 makeDates();loadData();renderAll();
 </script>
 </body>
