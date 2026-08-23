@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v74</title>
+<title>1人管理用シフト生成アプリ v75</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -214,7 +214,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v74</h1><div class="sub">設定/希望休 個別引継ぎ版</div></header>
+<header><h1>1人管理用シフト生成アプリ v75</h1><div class="sub">学生・バイト希望優先版</div></header>
 
 <main>
 <section class="card">
@@ -3397,6 +3397,37 @@ function v73CanAdd(k,s,d,st,en,role='ホール',allowOther=true){
   return v73AllowedShift(s,d,st,en,allowOther);
 }
 function v73Add(k,s,st,en){schedule[k]??={};schedule[k][s.id]={label:String(st),start:st,end:en};}
+function v75RequestedWorkDays(s){
+  if(!(s.category==='バイト 学生'||s.employment==='バイト 学生')) return 999;
+  let n=0;
+  dates.forEach(d=>{let r=v62Req(s,ymd(d)); if(s.input==='work'&&(r.m==='○'||r.m==='時間')) n++;});
+  return n;
+}
+function v75AssignedDays(s){let n=0;dates.forEach(d=>{if(schedule[ymd(d)]?.[s.id])n++;});return n;}
+function v75AssignedHours(s){let n=0;dates.forEach(d=>{let sh=schedule[ymd(d)]?.[s.id];if(sh)n+=Number(sh.end)-Number(sh.start);});return n;}
+function v75StudentRequestBonus(s,k){
+  if(!(s.category==='バイト 学生'||s.employment==='バイト 学生')) return 0;
+  let r=v62Req(s,k);
+  if(!(s.input==='work'&&(r.m==='○'||r.m==='時間'))) return 0;
+  // 学生・バイトは希望を最優先。希望日数が少ない人ほど強く優先する。
+  let req=Math.max(1,v75RequestedWorkDays(s));
+  return 5000-(req*120)-(v75AssignedDays(s)*35)-(v75AssignedHours(s)*2);
+}
+function v75PreplaceStudentRequests(role='ホール'){
+  let pool=v62Pool(role).filter(s=>(s.category==='バイト 学生'||s.employment==='バイト 学生'));
+  let ordered=pool.slice().sort((a,b)=>v75RequestedWorkDays(a)-v75RequestedWorkDays(b)||a.id.localeCompare(b.id));
+  dates.forEach(d=>{let k=ymd(d);ordered.forEach(s=>{
+    if(schedule[k]?.[s.id]||!v68CanWorkBase(s,d)) return;
+    let r=v62Req(s,k); if(!(s.input==='work'&&(r.m==='○'||r.m==='時間'))) return;
+    let pats=[]; let close=v62Close(d);
+    if(r.m==='時間'){
+      let h=Number(r.h); if(r.d==='from') pats=[[h,Math.min(close,Number(s.be)),1200]]; else pats=[[Math.max(Number(s.bs),h-5),h,1200]];
+    }else{
+      let st=Number(s.bs),en=Number(s.be); pats=[[st,en,1200],[st,Math.min(en,close),1100]];
+    }
+    v73PickAndAdd(k,d,[s],x=>true,pats,role,true,(x)=>v75StudentRequestBonus(x,k));
+  });});
+}
 function v73PickAndAdd(k,d,pool,filter,patterns,role='ホール',allowOther=true,extraScoreFn=null){
   let c=[];
   for(let s of pool.filter(filter)){
@@ -3404,7 +3435,7 @@ function v73PickAndAdd(k,d,pool,filter,patterns,role='ホール',allowOther=true
       let st=p[0], en=p[1], sc=p[2]||0;
       if(v73CanAdd(k,s,d,st,en,role,allowOther)){
         let fair=(typeof v70FairnessBonus==='function')?v70FairnessBonus(s,k):0;
-        c.push({s,st,en,score:sc+v62ScoreBase(s)+fair-(v69StartCount(k,st,role)*45)+(extraScoreFn?extraScoreFn(s,st,en):0)});
+        c.push({s,st,en,score:sc+v62ScoreBase(s)+fair+v75StudentRequestBonus(s,k)-(v69StartCount(k,st,role)*45)+(extraScoreFn?extraScoreFn(s,st,en):0)});
       }
     }
   }
@@ -3514,7 +3545,7 @@ function v73AutoMake(role='ホール'){
   role=role||'ホール'; let pool=v62Pool(role);
   dates.forEach(d=>{let k=ymd(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id]);});
   if(role!=='ホール'){quickSave();renderAll();alert('調理場は必要人数ルール未設定のため、今は自動生成していません');return;}
-  window.v73EmployeeOffPlan=v73PlanEmployeeOffs(role); window.v69EmployeeOffPlan=window.v73EmployeeOffPlan; window.v65EmployeeOffPlan=window.v73EmployeeOffPlan; window.v73SetupCounts={};
+  window.v73EmployeeOffPlan=v73PlanEmployeeOffs(role); v75PreplaceStudentRequests(role); window.v69EmployeeOffPlan=window.v73EmployeeOffPlan; window.v65EmployeeOffPlan=window.v73EmployeeOffPlan; window.v73SetupCounts={};
   dates.forEach(d=>{
     let k=ymd(d); let dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));
     v73EnsureSetup(k,d,dayPool,role);
