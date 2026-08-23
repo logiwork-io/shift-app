@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v88</title>
+<title>1人管理用シフト生成アプリ v90</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -214,7 +214,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v88</h1><div class="sub">希望入力拡張・育成優先・戦力構成版</div></header>
+<header><h1>1人管理用シフト生成アプリ v90</h1><div class="sub">希望入力拡張・育成優先・戦力構成版</div></header>
 
 <main>
 <section class="card">
@@ -4819,6 +4819,114 @@ function v89ValidateKitchen(){let out=[];dates.forEach(d=>{let k=ymd(d);for(let 
 function v89AutoMake(role){role=role||view.month||'ホール';if(role==='調理場')return v89GenerateKitchen();return v88AutoMake(role);}
 function v62AutoMake(role){return v89AutoMake(role||view.month||'ホール');}
 // ===== /v89 =====
+
+
+// ===== v90 完成シフト再調整 =====
+// ホール：昼の前倒しで夜の締め骨格を壊さない。
+function v90HallCloseSafeAfterMove(k,d,s,st,en){
+  let old=schedule[k]?.[s.id]?{...schedule[k][s.id]}:null;
+  schedule[k][s.id]={label:String(st),start:st,end:en};
+  let ok=v62CloseOk(k,d,'ホール');
+  if(old)schedule[k][s.id]=old;else delete schedule[k][s.id];
+  return ok;
+}
+function v88TryMoveEmployeeEarly(k,d,n,dayPool,role='ホール'){
+  let emps=dayPool.filter(s=>s.employment==='社員'&&schedule[k]?.[s.id]&&schedule[k][s.id].start>n.a);
+  emps.sort((a,b)=>(a.closePriority?1:0)-(b.closePriority?1:0)||schedule[k][a.id].start-schedule[k][b.id].start);
+  for(let s of emps){
+    let old={...schedule[k][s.id]}, dur=Math.max(7,Math.min(9,old.end-old.start));
+    let st=n.a,en=Math.min(v62Close(d),st+dur);
+    if(en-st<7||!v73AllowedShift(s,d,st,en,true)||v85MoveWouldBreakAbsolute(k,d,s,st,en,role))continue;
+    // もともと締め要員だった人を前倒しして、締め3人・社員・レジ締め・ドリバ締めを壊すのは禁止。
+    if(old.end>=v62Close(d)&&!v90HallCloseSafeAfterMove(k,d,s,st,en))continue;
+    schedule[k][s.id]={label:String(st),start:st,end:en};
+    if(v85BlockOk(k,d,n,role))return true;
+    schedule[k][s.id]=old;
+  }
+  return false;
+}
+// 昼補修後、締め骨格を必ず再構築。締め優先・上位ランクを優先し、昼へ動かし過ぎない。
+function v90RepairHallClosing(){
+  dates.forEach(d=>{
+    let k=ymd(d),pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));
+    let guard=0;
+    while(!v62CloseOk(k,d,'ホール')&&guard++<10){
+      v85EnsureClosing(k,d,pool,'ホール');
+      if(v62CloseOk(k,d,'ホール'))break;
+      let close=v62Close(d);
+      let cand=pool.filter(s=>!schedule[k]?.[s.id]&&v62CloseTimePossible(s,d));
+      cand.sort((a,b)=>(b.closePriority?1:0)-(a.closePriority?1:0)||v85RankPower(b)-v85RankPower(a)||v75AssignedHours(a)-v75AssignedHours(b));
+      let added=false;
+      for(let s of cand){
+        for(let st of [17,16,18,15,14]){
+          if(close-st>9||!v73CanAdd(k,s,d,st,close,'ホール',true))continue;
+          v73Add(k,s,st,close);added=true;break;
+        }
+        if(added)break;
+      }
+      if(!added)break;
+    }
+  });
+}
+
+// 調理場：10時入りは仕込みスキル必須。
+function v90KitchenStartAllowed(s,st){return Number(st)!==10||!!s.skills?.includes('仕込み');}
+function v89KitchenCanAdd(k,s,d,st,en){
+  if(schedule[k]?.[s.id])return false;if(!v89ReqAvailable(s,k))return false;
+  if(!v90KitchenStartAllowed(s,st))return false;
+  if(!v73AllowedShift(s,d,st,en,true))return false;if(v62WouldRunBad(s.id,k,st,en))return false;return true;
+}
+// 9-11は仕込み担当を骨格として先に確保する。
+function v90EnsureKitchenOpening(k,d,pool,plans){
+  const addPrep=(a,b)=>{
+    let active=pool.filter(s=>v62Covers(k,s.id,a,b));
+    let need=a===9?1:2;
+    let guard=0;
+    while(active.length<need&&guard++<12){
+      let n={a,b,min:need,label:'仕込み'};
+      if(!v89AddKitchenBest(k,d,n,s=>s.skills?.includes('仕込み')))break;
+      active=pool.filter(s=>v62Covers(k,s.id,a,b));
+    }
+  };
+  addPrep(9,10);addPrep(10,11);
+}
+// 夕方は「早番が帰る前に遅番を入れる」。18時以降は専任3人を必ず残す。
+function v90EnsureKitchenNight(k,d,pool){
+  let close=v62Close(d);
+  for(let n of [{a:16,b:18,min:4},{a:18,b:close,min:3}]){
+    let guard=0;
+    while(v89DedicatedHead(k,n)<n.min&&guard++<20){
+      if(!v89AddKitchenBest(k,d,n,s=>Number(s.be)>=n.b||v62CloseTimePossible(s,d)))break;
+    }
+    v89EnsureKitchenMentor(k,d,n);
+  }
+}
+function v90GenerateKitchen(){let role='調理場',pool=v89KitchenDedicated(),plans=v89PlanKitchenEmployees();window.v65EmployeeOffPlan=plans;
+  dates.forEach(d=>{let k=ymd(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id]);});
+  dates.forEach(d=>{let k=ymd(d);
+    // 時間固定。ただし10時開始は仕込み持ちだけ。
+    pool.filter(s=>v68MainMode(s)==='時間固定'&&v89ReqAvailable(s,k)&&!(plans[s.id]?.has(k))).forEach(s=>{let st=Number(s.bs),en=Math.min(Number(s.be),v62Close(d));if(v89KitchenCanAdd(k,s,d,st,en))v73Add(k,s,st,en);});
+    v90EnsureKitchenOpening(k,d,pool,plans);
+    // 社員骨格
+    pool.filter(s=>s.employment==='社員'&&v89ReqAvailable(s,k)&&!(plans[s.id]?.has(k))).sort((a,b)=>v85RankPower(b)-v85RankPower(a)).forEach(s=>{if(schedule[k]?.[s.id])return;let n=v89KitchenBlocks(d).find(x=>v89DedicatedHead(k,x)<x.min)||v89KitchenBlocks(d)[0];let pats=v89KitchenPatterns(s,d,n).filter(p=>v89KitchenCanAdd(k,s,d,p[0],p[1]));pats.sort((a,b)=>(b[2]||0)-(a[2]||0));if(pats[0])v73Add(k,s,pats[0][0],pats[0][1]);});
+    for(let n of v89KitchenBlocks(d)){
+      v89EnsureKitchenIron(k,d,n);let guard=0;
+      while(!v89KitchenBlockOk(k,d,n)&&guard++<20){if(!v89AddKitchenBest(k,d,n))break;}
+      v89EnsureKitchenMentor(k,d,n);
+    }
+    v90EnsureKitchenNight(k,d,pool);
+  });
+  quickSave();renderAll();let issues=v90ValidateKitchen();alert(issues.length?`調理場の自動生成をしました\n確認が必要な項目：${issues.length}件`:'調理場の自動生成をしました');
+}
+function v90ValidateKitchen(){let out=v89ValidateKitchen();dates.forEach(d=>{let k=ymd(d);
+  for(let s of v89KitchenDedicated()){
+    let sh=schedule[k]?.[s.id];if(sh&&Number(sh.start)===10&&!s.skills?.includes('仕込み'))out.push(`${k}: ${s.name} は仕込み無しで10時出勤`);
+  }
+  let close=v62Close(d),n={a:18,b:close};if(v89DedicatedHead(k,n)<3)out.push(`${k}: 18時以降の調理場が3人未満`);
+});return [...new Set(out)];}
+function v90AutoMake(role){role=role||view.month||'ホール';if(role==='調理場')return v90GenerateKitchen();v88AutoMake(role);v90RepairHallClosing();quickSave();renderAll();}
+function v62AutoMake(role){return v90AutoMake(role||view.month||'ホール');}
+// ===== /v90 =====
 
 </script>
 </body>
