@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v75</title>
+<title>1人管理用シフト生成アプリ v76</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -214,7 +214,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v75</h1><div class="sub">学生・バイト希望優先版</div></header>
+<header><h1>1人管理用シフト生成アプリ v76</h1><div class="sub">完成シフト型ロジック・締め優先版</div></header>
 
 <main>
 <section class="card">
@@ -389,6 +389,7 @@ function applyDataObject(d){
     if(s.max===undefined) s.max=5;
     if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
     if(s.mainMode===undefined) s.mainMode='フリー';
+    if(s.closePriority===undefined) s.closePriority=false;
     if(s.mainMode==='固定') s.mainMode='時間固定';
   });
   requests=d.requests||{};
@@ -441,6 +442,7 @@ function importSettingsData(){
       if(s.category===undefined) s.category=staffCategory(s);
       if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
       if(s.mainMode===undefined) s.mainMode='フリー';
+      if(s.closePriority===undefined) s.closePriority=false;
       if(s.mainMode==='固定') s.mainMode='時間固定';
       if(s.max===undefined) s.max=5;
     });
@@ -2927,6 +2929,7 @@ function openDetail(id){
   if(s.weekend===undefined) s.weekend=true;
   if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
   if(s.mainMode===undefined) s.mainMode='フリー';
+  if(s.closePriority===undefined) s.closePriority=false;
   if(s.employment===undefined || s.employment==='バイト') s.employment = staffCategory(s);
   s.category=s.employment;
   detailTitle.textContent=s.name+' 詳細';
@@ -2964,6 +2967,7 @@ function openDetail(id){
     <label><input type="checkbox" ${s.skills?.includes('串打ち')?'checked':''} onchange="toggleSkill('串打ち',this.checked)"> 串打ち</label>
     <label><input type="checkbox" ${s.skills?.includes('鉄板')?'checked':''} onchange="toggleSkill('鉄板',this.checked)"> 鉄板</label>
     <label><input type="checkbox" ${s.skills?.includes('新人')?'checked':''} onchange="toggleSkill('新人',this.checked)"> 新人</label>
+    <label><input type="checkbox" ${s.closePriority?'checked':''} onchange="setStaff('closePriority',this.checked)"> 締め優先</label>
   </div>
   <div class="row" style="margin-top:12px"><button onclick="confirmDetail()">決定</button><button class="sec" onclick="closeDetail()">閉じる</button><button class="danger" onclick="deleteStaff('${s.id}')">削除</button></div>`;
   detailModal.classList.remove('hide');
@@ -3387,6 +3391,13 @@ function v73MaxConsecOk(id,k){
 function v73AllowedShift(s,d,st,en,allowOther=true){
   if(en<=st || en-st>9) return false;
   if(s.employment==='社員' && (en-st<7 || en-st>9)) return false;
+  // v76: 社員の「フリー」は基本時間を基準にしつつ、人数調整で前後へ動かせる。
+  // 時間固定/出勤固定/退勤固定は従来どおり固定条件を守る。
+  if(s.employment==='社員' && v68MainMode(s)==='フリー'){
+    if(!v68CanWorkBase(s,d) || !v62TimeReqOk(s,d,st,en)) return false;
+    if(v62Weekend(d)&&s.weekend===false) return false;
+    return st>=9 && en<=v62Close(d);
+  }
   return v68CanShift(s,d,st,en,allowOther);
 }
 function v73CanAdd(k,s,d,st,en,role='ホール',allowOther=true){
@@ -3541,6 +3552,109 @@ function v73Spread(k,d,role='ホール'){
     }
   }
 }
+// ===== v76 完成シフト型ロジック =====
+function v76WeekendTarget(d,n){
+  if(!v62Weekend(d) || n.a<11) return n.min;
+  // 土日祝は平日より厚め。ピーク帯は+2、それ以外は+1。
+  let extra=(n.a>=13&&n.a<20)?2:1;
+  return n.min+extra;
+}
+function v76EnsureEarlyEmployee(k,d,dayPool,role='ホール'){
+  // 11時以降は社員を必ず置く。11時担当は「締め優先ではない社員」を先にする。
+  if(v68EmployeeCovers(k,d,11,13,role)) return;
+  let emps=dayPool.filter(s=>s.employment==='社員'&&!v73EmpOff(s,k));
+  emps.sort((a,b)=>(a.closePriority?1:0)-(b.closePriority?1:0)||Number(a.bs)-Number(b.bs)||a.id.localeCompare(b.id));
+  for(let s of emps){
+    let old=schedule[k]?.[s.id];
+    if(!old) continue;
+    let dur=Math.max(7,Math.min(9,Number(old.end)-Number(old.start)||8));
+    let en=Math.min(v62Close(d),11+dur);
+    if(v73AllowedShift(s,d,11,en,true)){schedule[k][s.id]={label:'11',start:11,end:en};return;}
+  }
+  for(let s of emps){
+    for(let en of [20,19,18]) if(v73CanAdd(k,s,d,11,en,role,true)){v73Add(k,s,11,en);return;}
+  }
+}
+function v76EnsureClosingPriority(k,d,dayPool,role='ホール'){
+  let close=v62Close(d);
+  // 締め優先ONの社員が出勤する日は、可能なら遅番側へ寄せる。
+  let ps=dayPool.filter(s=>s.employment==='社員'&&s.closePriority&&!v73EmpOff(s,k));
+  for(let s of ps){
+    let sh=schedule[k]?.[s.id]; if(!sh) continue;
+    if(sh.end>=close) continue;
+    let st=Math.max(11,close-9);
+    if(v73AllowedShift(s,d,st,close,true)) schedule[k][s.id]={label:String(st),start:st,end:close};
+  }
+}
+function v76DayCoreOk(k,d,role='ホール'){
+  // セッティング
+  let setup=v62Pool(role).filter(s=>schedule[k]?.[s.id]?.start===9);
+  if(setup.length!==1 || !v62SetupSkill(setup[0])) return false;
+  // 社員11時以降
+  if(!v68EmployeeCovers(k,d,11,13,role)) return false;
+  // 締め条件
+  if(!v62CloseOk(k,d,role)) return false;
+  // 必要人数（土日祝は+1〜2）
+  for(let n of v62Blocks(d)) if(v62Head(k,n.a,n.b,role)<v76WeekendTarget(d,n)) return false;
+  return true;
+}
+function v76PruneExcess(k,d,role='ホール'){
+  // 骨格完成後、余剰だけ削る。学生は希望日数が多い人から調整対象。
+  let list=v62Pool(role).filter(s=>schedule[k]?.[s.id]);
+  list.sort((a,b)=>{
+    let ae=a.employment==='社員', be=b.employment==='社員'; if(ae!==be) return ae?1:-1;
+    let as=(a.category==='バイト 学生'||a.employment==='バイト 学生'), bs=(b.category==='バイト 学生'||b.employment==='バイト 学生');
+    if(as&&bs){let q=v75RequestedWorkDays(b)-v75RequestedWorkDays(a); if(q) return q;}
+    if(as!==bs) return as?-1:1;
+    if(a.closePriority!==b.closePriority) return a.closePriority?1:-1;
+    return v75AssignedHours(b)-v75AssignedHours(a);
+  });
+  for(let s of list){
+    let old=schedule[k]?.[s.id]; if(!old) continue;
+    // 9時担当は削らない
+    if(old.start===9) continue;
+    delete schedule[k][s.id];
+    if(!v76DayCoreOk(k,d,role)) schedule[k][s.id]=old;
+  }
+}
+function v76EnsureMinimum(k,d,dayPool,role='ホール'){
+  let close=v62Close(d);
+  for(let n of v62Blocks(d)){
+    let target=v76WeekendTarget(d,n), guard=0;
+    while(v62Head(k,n.a,n.b,role)<target && guard++<18){
+      let pats=v62Weekend(d)?[[11,16,600],[11,18,590],[12,18,560],[13,23,560],[14,23,550],[15,23,540],[16,23,520],[17,23,500],[18,23,430]]:[[11,16,600],[11,17,600],[12,17,540],[11,20,540],[13,22,530],[15,22,520],[16,22,500],[17,22,480],[18,22,420]];
+      pats=pats.map(p=>[p[0],Math.min(p[1],close),p[2]]).filter(p=>p[0]<n.b&&p[1]>n.a&&p[1]>p[0]);
+      if(!v73PickAndAdd(k,d,dayPool,s=>!(s.employment==='社員'&&v73EmpOff(s,k)),pats,role,true)) break;
+    }
+  }
+}
+function v76AutoMake(role='ホール'){
+  role=role||'ホール'; let pool=v62Pool(role);
+  dates.forEach(d=>{let k=ymd(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id]);});
+  if(role!=='ホール'){quickSave();renderAll();alert('調理場は必要人数ルール未設定のため、今は自動生成していません');return;}
+  window.v73EmployeeOffPlan=v73PlanEmployeeOffs(role); window.v69EmployeeOffPlan=window.v73EmployeeOffPlan; window.v65EmployeeOffPlan=window.v73EmployeeOffPlan; window.v73SetupCounts={};
+  // 1) 希望日数が少ない学生から希望を先に確保
+  v75PreplaceStudentRequests(role);
+  // 2) 日ごとの骨格：9時、社員、11時社員、締め、必要人数
+  dates.forEach(d=>{
+    let k=ymd(d), dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));
+    v73EnsureSetup(k,d,dayPool,role);
+    dayPool.filter(s=>s.employment==='社員').sort((a,b)=>Number(a.bs)-Number(b.bs)||a.id.localeCompare(b.id)).forEach(s=>v73PickAndAdd(k,d,[s],x=>true,v73EmployeePatterns(s,d),role,true));
+    v76EnsureEarlyEmployee(k,d,dayPool,role);
+    v76EnsureClosingPriority(k,d,dayPool,role);
+    v73EnsureClosing(k,d,dayPool,role);
+    v76EnsureMinimum(k,d,dayPool,role);
+    v73Spread(k,d,role); v73EnsureSetup(k,d,dayPool,role);
+  });
+  // 3) 余剰を削り、骨格を再補修
+  dates.forEach(d=>{let k=ymd(d);v76PruneExcess(k,d,role);});
+  dates.forEach(d=>{
+    let k=ymd(d), dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));
+    v73EnsureSetup(k,d,dayPool,role); v76EnsureEarlyEmployee(k,d,dayPool,role); v76EnsureClosingPriority(k,d,dayPool,role); v73EnsureClosing(k,d,dayPool,role); v76EnsureMinimum(k,d,dayPool,role); v73Spread(k,d,role);
+  });
+  quickSave(); renderAll(); let issues=validateCoreRulesV50(role); alert(issues.length?`ホールの自動生成をしました\n確認が必要な項目：${issues.length}件`:'ホールの自動生成をしました');
+}
+// ===== /v76 =====
 function v73AutoMake(role='ホール'){
   role=role||'ホール'; let pool=v62Pool(role);
   dates.forEach(d=>{let k=ymd(d);schedule[k]??={};pool.forEach(s=>delete schedule[k][s.id]);});
@@ -3560,7 +3674,7 @@ function v73AutoMake(role='ホール'){
   dates.forEach(d=>{let k=ymd(d);let dayPool=pool.filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureEmployeeCover(k,d,dayPool,role);v73EnsureClosing(k,d,dayPool,role);v73EnsureMinimum(k,d,dayPool,role);v73Spread(k,d,role);v73EnsureSetup(k,d,dayPool,role);});
   quickSave(); renderAll(); let issues=validateCoreRulesV50(role); alert(issues.length?`ホールの自動生成をしました\n確認が必要な項目：${issues.length}件`:'ホールの自動生成をしました');
 }
-function v62AutoMake(role){return v73AutoMake(role||view.month||'ホール');}
+function v62AutoMake(role){return v76AutoMake(role||view.month||'ホール');}
 // ===== /v73 =====
 
 function renderAll(){updateTabs();renderReq();renderMonth();renderDay();renderHours()}
