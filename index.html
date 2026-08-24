@@ -5122,5 +5122,115 @@ function v62AutoMake(role){return v107AutoMake(role||view.month||'ホール');}
 function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v107Validate('ホール'));if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
 // ===== /v107 =====
 </script>
+
+<script>
+// ===== v109 月間バランス重視：主軸は最低1人、全員候補から公平に削る =====
+function v109IsStudent(s){return staffCategory(s)==='バイト 学生';}
+function v109IsEarly(s){return s.role==='ホール'&&staffCategory(s)==='バイト 早番';}
+function v109IsLifeFree(s){let c=staffCategory(s);return s.role==='ホール'&&!v109IsStudent(s)&&(c==='バイト 遅番'||c==='バイト フリー');}
+function v109IsB(s){return s.role==='ホール'&&s.employment!=='社員'&&v85RankPower(s)>=1.0;}
+function v109AssignedDays(s){return dates.reduce((n,d)=>n+(schedule[ymd(d)]?.[s.id]?1:0),0);}
+function v109RequestedDays(s){return v75RequestedWorkDays(s);}
+function v109StudentFloor(s){let r=v109RequestedDays(s);if(r<=0)return 0;if(r<=5)return r;if(r<=9)return Math.ceil(r*.75);return Math.max(4,Math.ceil(r*.50));}
+function v109SoleBInCoveredBlock(s,k,d){for(let n of v62Blocks(d)){if(!v62Covers(k,s.id,n.a,n.b)||n.a<11)continue;let bs=v62Pool('ホール').filter(x=>x.id!==s.id&&v109IsB(x)&&v62Covers(k,x.id,n.a,n.b));if(bs.length===0)return true;}return false;}
+function v109DayRemovable(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;
+ // 9時の唯一のセッティング担当は残す
+ if(old.start===9){let other=v62Pool('ホール').filter(x=>x.id!==s.id&&schedule[k]?.[x.id]?.start===9&&v62SetupSkill(x));if(!other.length)return false;}
+ // B以上は「その時間帯に最低1人」。唯一のBだけ保護
+ if(v109IsB(s)&&v109SoleBInCoveredBlock(s,k,d))return false;
+ delete schedule[k][s.id];
+ let ok=true;
+ for(let n of v62Blocks(d)){
+   if(!v62Covers({[s.id]:old},s.id,n.a,n.b) && !(old.start<n.b&&old.end>n.a)) continue;
+   let count=v62Pool('ホール').filter(x=>v62Covers(k,x.id,n.a,n.b)).length;
+   if(count<v107Target(d,n)){ok=false;break;}
+   if(n.a>=11&&!v107PartTimeBPresent(k,n.a,n.b)){ok=false;break;}
+   if(n.a>=11&&!v85HasCoreStrength(k,n.a,n.b,'ホール')){ok=false;break;}
+   if(!v85TraineeMentored(k,n.a,n.b,'ホール')){ok=false;break;}
+ }
+ if(ok&&!v68EmployeeCovers(k,d,11,13,'ホール'))ok=false;
+ if(ok&&!v62CloseOk(k,d,'ホール'))ok=false;
+ schedule[k][s.id]=old;return ok;
+}
+function v109RemovalScore(s,k,d,cut){let score=0,r=reqObj(s.id,k),pow=v85RankPower(s),days=v109AssignedDays(s),hrs=v75AssignedHours(s);
+ if(s.employment==='社員')return -99999;
+ let p=schedule[k]?.[s.id];if(p?.start===9&&v62SetupSkill(s))score-=2500;
+ if(v109IsB(s)&&v109SoleBInCoveredBlock(s,k,d))score-=6000; // 必要な1人だけを守る
+ if(s.closePriority)score-=1200;
+ // ランクは同条件のときだけ効かせる。Bを複数残すための絶対保護にはしない
+ if(pow>=1.25)score-=350; else if(pow>=1.0)score-=180; else if(pow<0.7)score+=220;
+ // 月間で多く入っている人ほど調整候補
+ score+=hrs*5+days*20;
+ // 同じ人ばかり削らない
+ score-=(cut[s.id]||0)*550;
+ if(v109IsStudent(s)){
+   let req=v109RequestedDays(s),floor=v109StudentFloor(s);
+   // 希望が多い学生ほど調整しやすい。ただし最低採用目安を下回るまでは保護
+   score+=req*45;
+   if(days<=floor)score-=2200;
+   if(req<=5)score-=900;
+ }else if(v109IsLifeFree(s)){
+   // フリーターは生活主軸。学生のためだけに削らないが、過剰なら普通に調整対象
+   score-=650;
+ }else if(v109IsEarly(s)){
+   // 早番は安福/西山/巣立などの偏りを月間勤務量で均す
+   let peers=v62Pool('ホール').filter(v109IsEarly);
+   let minH=Math.min(...peers.map(v75AssignedHours));
+   if(hrs<=minH+8)score-=800;
+ }
+ if(r.m==='△')score+=900;
+ return score;
+}
+function v109TrimDay(k,d,cut){let guard=0;while(guard++<60){let list=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員');let removable=list.filter(s=>v109DayRemovable(s,k,d));if(!removable.length)break;removable.sort((a,b)=>v109RemovalScore(b,k,d,cut)-v109RemovalScore(a,k,d,cut));let s=removable[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v109RepairMaxConsecutive(){for(let s of v62Pool('ホール')){let max=Number(s.max||5),run=[];for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id])run.push(d);else run=[];if(run.length>max){let choices=run.slice().sort((a,b)=>{let ka=ymd(a),kb=ymd(b);return v109RemovalScore(s,kb,b,{})-v109RemovalScore(s,ka,a,{});});let removed=false;for(let x of choices){let kx=ymd(x);if(v109DayRemovable(s,kx,x)){delete schedule[kx][s.id];removed=true;break;}}if(removed)run=[];}}}}
+function v109CandidateScore(s,k,d,n){let score=v85CandidateScore(s,k,d,n),hrs=v75AssignedHours(s),days=v109AssignedDays(s),pow=v85RankPower(s),req=v109RequestedDays(s);
+ // 不足時間帯にBがいない時だけBを強く優先。すでにBがいれば通常比較へ戻す
+ if(n.a>=11&&!v107PartTimeBPresent(k,n.a,n.b)&&v109IsB(s))score+=5000;
+ if(v109IsLifeFree(s))score+=500-Math.min(500,hrs*3);
+ if(v109IsStudent(s)){
+   if(!v76StudentRequested(s,k))return -999999;
+   score+=900-req*35-days*25;
+   if(days<v109StudentFloor(s))score+=1400;
+ }
+ if(v109IsEarly(s)){
+   let peers=v62Pool('ホール').filter(v109IsEarly),minH=Math.min(...peers.map(v75AssignedHours));
+   if(hrs<=minH+8)score+=600;
+ }
+ score+=pow*80;
+ return score;
+}
+function v109RepairDay(k,d){let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');v76EnsureEarlyEmployee(k,d,pool,'ホール');
+ for(let n of v62Blocks(d)){let guard=0;while(guard++<20){let count=v62Pool('ホール').filter(s=>v62Covers(k,s.id,n.a,n.b)).length;let needCount=count<v107Target(d,n),needB=n.a>=11&&!v107PartTimeBPresent(k,n.a,n.b),needStrength=n.a>=11&&!v85HasCoreStrength(k,n.a,n.b,'ホール');if(!needCount&&!needB&&!needStrength)break;let cand=[];
+   for(let s of pool){if(schedule[k]?.[s.id])continue;if(v109IsStudent(s)&&!v76StudentRequested(s,k))continue;let pats=v109IsStudent(s)?v85StudentPatterns(s,d):v76CandidatePatterns(s,d,n);for(let p of pats){if(Number(p[0])===10||!v107StartAllowed(s,k,p[0])||!v73CanAdd(k,s,d,p[0],p[1],'ホール',true))continue;let sc=v109CandidateScore(s,k,d,n);if(needB&&!v109IsB(s))sc-=4500;cand.push({s,p,sc});}}
+   cand.sort((a,b)=>b.sc-a.sc);if(!cand.length)break;v73Add(k,cand[0].s,cand[0].p[0],cand[0].p[1]);
+ }}v85EnsureClosing(k,d,pool,'ホール');}
+function v109RebalanceEarly(){let early=v62Pool('ホール').filter(v109IsEarly);if(early.length<2)return;for(let loop=0;loop<40;loop++){early.sort((a,b)=>v75AssignedHours(a)-v75AssignedHours(b));let low=early[0],high=early[early.length-1];if(v75AssignedHours(high)-v75AssignedHours(low)<=18)break;let changed=false;for(let d of dates){let k=ymd(d),ph=schedule[k]?.[high.id];if(!ph||schedule[k]?.[low.id]||!v68CanWorkBase(low,d)||v73EmpOff(low,k))continue;let pats=v76CandidatePatterns(low,d,{a:ph.start,b:ph.end});for(let p of pats){if(Number(p[0])===10||!v107StartAllowed(low,k,p[0])||!v73AllowedShift(low,d,p[0],p[1],true))continue;let old=ph;delete schedule[k][high.id];schedule[k][low.id]={label:String(p[0]),start:p[0],end:p[1]};if(v107DayIssues(k,d).length===0){changed=true;break;}delete schedule[k][low.id];schedule[k][high.id]=old;}if(changed)break;}if(!changed)break;}}
+function v109BalanceStudents(){let students=v62Pool('ホール').filter(v109IsStudent),life=v62Pool('ホール').filter(v109IsLifeFree);if(!students.length)return;
+ // 希望があるのに極端に少ない学生を、過剰な日の入替で戻す
+ for(let s of students.sort((a,b)=>v109RequestedDays(a)-v109RequestedDays(b))){let floor=v109StudentFloor(s),guard=0;while(v109AssignedDays(s)<floor&&guard++<40){let inserted=false;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]||!v76StudentRequested(s,k))continue;let pats=v85StudentPatterns(s,d);for(let p of pats){if(!p||Number(p[0])>18||!v73AllowedShift(s,d,p[0],p[1],true))continue; // まず追加して、同日から余剰1人を公平に削る
+ schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};let cut={};v109TrimDay(k,d,cut);if(schedule[k]?.[s.id]&&v107DayIssues(k,d).length===0){inserted=true;break;}if(schedule[k]?.[s.id])delete schedule[k][s.id];}
+ if(inserted)break;}if(!inserted)break;}}
+ // フリーターの最少時間を学生最大が超える場合だけ、高希望学生から調整
+ if(life.length){for(let loop=0;loop<80;loop++){let minF=Math.min(...life.map(v75AssignedHours)),over=students.filter(s=>v75AssignedHours(s)>minF).sort((a,b)=>v109RequestedDays(b)-v109RequestedDays(a)||v75AssignedHours(b)-v75AssignedHours(a));if(!over.length)break;let changed=false;for(let s of over){if(v109AssignedDays(s)<=v109StudentFloor(s))continue;for(let d of dates){let k=ymd(d);if(!schedule[k]?.[s.id]||!v109DayRemovable(s,k,d))continue;delete schedule[k][s.id];changed=true;break;}if(changed)break;}if(!changed)break;}}
+}
+function v109AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{
+ // 既存の骨格を一度作り、出勤可能者を広く候補化
+ v106AutoHallFinal();v107AddAllCandidates();
+ // 不足を修復してから、各日を公平に削る
+ for(let d of dates)v109RepairDay(ymd(d),d);
+ let cut={};for(let d of dates)v109TrimDay(ymd(d),d,cut);
+ // 月間偏り・連勤・学生最低採用目安を補正
+ v109RepairMaxConsecutive();for(let d of dates)v109RepairDay(ymd(d),d);
+ v109RebalanceEarly();v109BalanceStudents();
+ for(let d of dates)v109RepairDay(ymd(d),d);
+ // 最後にもう一度余剰のみ削る（Bは唯一の1人だけ保護）
+ cut={};for(let d of dates)v109TrimDay(ymd(d),d,cut);
+ v109RepairMaxConsecutive();for(let d of dates)v109RepairDay(ymd(d),d);
+ }finally{window.alert=realAlert;}quickSave();renderAll();let q=v107Validate('ホール');realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v109AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v109AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v109AutoMake(role||view.month||'ホール');}
+// ===== /v109 =====
+</script>
+
 </body>
 </html>
