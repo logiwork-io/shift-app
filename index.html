@@ -5232,5 +5232,410 @@ function v62AutoMake(role){return v109AutoMake(role||view.month||'ホール');}
 // ===== /v109 =====
 </script>
 
+
+<script>
+// ===== v110 完成シフト思想：全員候補→時間帯の営業力→月間公平性で余剰削減 =====
+function v110IsStudent(s){return staffCategory(s)==='バイト 学生';}
+function v110IsLifeFree(s){let c=staffCategory(s);return s.role==='ホール'&&!v110IsStudent(s)&&(c==='バイト 遅番'||c==='バイト フリー');}
+function v110IsEarly(s){return s.role==='ホール'&&staffCategory(s)==='バイト 早番';}
+function v110IsPartTimeB(s){return s.role==='ホール'&&s.employment!=='社員'&&v85RankPower(s)>=1.0;}
+function v110FullHall(s){return v85HallCommitment(s)>=0.99;}
+function v110ExplicitLateStart(s,k){let r=reqObj(s.id,k);if(r.m!=='時間')return false;let ts=r.ts!==undefined&&r.ts!==''?Number(r.ts):null,te=r.te!==undefined&&r.te!==''?Number(r.te):null; if(ts!==null&&ts>18)return true;let h=r.h!==undefined&&r.h!==''?Number(r.h):null;return r.d==='from'&&h!==null&&h>18;}
+function v110StartAllowed(s,k,st){return Number(st)<=18||v110ExplicitLateStart(s,k);}
+function v110NormalAvailable(s,d){let k=ymd(d),r=reqObj(s.id,k);if(v62Weekend(d)&&s.weekend===false)return false;if(s.input==='work')return r.m==='○'||r.m==='時間';if(r.m==='×'||r.m==='△')return false;return true;}
+function v110EmergencyAvailable(s,d){let k=ymd(d),r=reqObj(s.id,k);if(v62Weekend(d)&&s.weekend===false)return false;if(s.input==='work')return r.m==='○'||r.m==='時間';return r.m==='△';}
+function v110HasDriba(k,a,b){return v62Pool('ホール').some(s=>v62Covers(k,s.id,a,b)&&(s.skills||[]).includes('ドリバ'));}
+function v110BlockPeople(k,a,b){return v62Pool('ホール').filter(s=>v62Covers(k,s.id,a,b));}
+function v110RankCounts(k,a,b){let active=v110BlockPeople(k,a,b),full=active.filter(v110FullHall);let c={A:0,B:0,C:0,D:0,E:0,all:active.length,full:full.length};for(let s of full)c[s.rank]=(c[s.rank]||0)+1;return c;}
+function v110HasPartTimeB(k,a,b){return v110BlockPeople(k,a,b).some(v110IsPartTimeB);}
+// 完成シフトの戦力感覚。A/Bが多い時は人数を絞り、低ランク中心なら人数で厚くする。
+function v110CompositionOkay(k,d,n){if(n.a<11)return true;let c=v110RankCounts(k,n.a,n.b),hasB=v110HasPartTimeB(k,n.a,n.b);if(!hasB)return false;
+  // ホール専任Aが2人以上＋Bなら、C/Dを1人足した4人で十分。
+  if(c.A>=2)return c.all>=4;
+  // Aが1人＋Bがいる場合：C以上がいれば4人、D中心なら5人ほしい。
+  if(c.A>=1){if(c.C>=1||c.B>=2)return c.all>=4;return c.all>=5;}
+  // Aがいない時：B+C+C+D+D 程度を目安。B+C+D+D+Dもギリ許容。
+  if(c.B>=1){if(c.C>=2)return c.all>=5;if(c.C>=1)return c.all>=5;return c.all>=6;}
+  return false;
+}
+function v110WeekendExtra(k,d,n){if(!v62Weekend(d)||n.a<11)return 0;let c=v110RankCounts(k,n.a,n.b); // 基本+1、弱め構成は+2
+  if(c.A===0 && c.B<=1 && c.C<=1)return 2;
+  if(c.A===1 && c.B===1 && c.C===0)return 2;
+  return 1;
+}
+function v110Target(k,d,n){return n.min+v110WeekendExtra(k,d,n);}
+function v110BlockOkay(k,d,n){let count=v110BlockPeople(k,n.a,n.b).length;if(count<v110Target(k,d,n))return false;if(n.a>=11&&!v110CompositionOkay(k,d,n))return false;if(n.a>=11&&!v110HasDriba(k,n.a,n.b))return false;return true;}
+function v110DayIssues(k,d){let out=[],pool=v62Pool('ホール'),nine=pool.filter(s=>schedule[k]?.[s.id]?.start===9);
+ if(nine.length!==1)out.push(`${k}: 9時入り${nine.length}人`);if(nine.length===1&&!v62SetupSkill(nine[0]))out.push(`${k}: セッティングスキルなし`);
+ for(let s of pool){let p=schedule[k]?.[s.id];if(!p)continue;let r=reqObj(s.id,k);if(p.start===10)out.push(`${k}: ${s.name} ホール10時入り`);if(!v110StartAllowed(s,k,p.start))out.push(`${k}: ${s.name} 18時以降の通常出勤`);if(r.m==='×')out.push(`${k}: ${s.name}休み希望違反`);if(s.input==='work'&&!(r.m==='○'||r.m==='時間'))out.push(`${k}: ${s.name}出勤希望なし`);if(!v62TimeReqOk(s,d,p.start,p.end))out.push(`${k}: ${s.name}時間希望違反`);}
+ for(let n of v62Blocks(d)){if(!v110BlockOkay(k,d,n)){let count=v110BlockPeople(k,n.a,n.b).length,target=v110Target(k,d,n);if(count<target)out.push(`${k}: ${n.a}-${n.b} 人数不足 ${count}/${target}`);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} バイトB以上不在`);if(n.a>=11&&!v110CompositionOkay(k,d,n))out.push(`${k}: ${n.a}-${n.b} 戦力構成NG`);if(n.a>=11&&!v110HasDriba(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} ドリバ不在`);}if(!v85TraineeMentored(k,n.a,n.b,'ホール'))out.push(`${k}: ${n.a}-${n.b} 育成主軸不足`);}
+ if(!v68EmployeeCovers(k,d,11,13,'ホール'))out.push(`${k}: 11時台に社員なし`);if(!v62CloseOk(k,d,'ホール'))out.push(`${k}: 閉店条件NG`);return [...new Set(out)];}
+function v110PatternPool(s,d,n){let k=ymd(d),out=[];if(v110IsStudent(s))out=v85StudentPatterns(s,d).map(p=>[Number(p[0]),Number(p[1])]);else out=v76CandidatePatterns(s,d,n).map(p=>[Number(p[0]),Number(p[1])]);
+ let mode=v68MainMode(s),close=v62Close(d),bs=Number(s.bs),be=Math.min(Number(s.be),close);
+ if(mode==='時間固定'||mode==='出勤固定')out.push([bs,be]);
+ // フリー早番は基本時間の中で後ろ倒し可。9時枠が埋まっていれば11時開始も自然な候補。
+ if(!v110IsStudent(s)&&mode==='フリー'&&v110IsEarly(s)){for(let st of [bs,11,12,13]){if(st<bs||st>=be)continue;let en=Math.min(be,st+9);if(en>st)out.push([st,en]);}}
+ // フリー/遅番Bは、早番主軸が13時で切れる日に13時から20/22まで繋ぐ候補を持つ。
+ if(!v110IsStudent(s)&&mode==='フリー'&&v110IsLifeFree(s)){for(let en of [20,22,close]){let st=13;if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}for(let st of [14,15,16,17,18]){let en=Math.min(close,Math.max(Number(s.be)||22,st+4));if(en>st&&en-st<=9)out.push([st,en]);}}
+ let seen=new Set();return out.filter(p=>{let [st,en]=p;if(!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>9||st===10||!v110StartAllowed(s,k,st))return false;let key=st+'-'+en;if(seen.has(key))return false;seen.add(key);return true;});}
+function v110DefaultPattern(s,d){let k=ymd(d),mode=v68MainMode(s),close=v62Close(d),bs=Number(s.bs),be=Math.min(Number(s.be),close);if(v110IsStudent(s)){let p=v85StudentPatterns(s,d)[0];return p?[Number(p[0]),Number(p[1])]:null;}if(mode==='時間固定'||mode==='出勤固定')return [bs,be];let st=bs,en=be;if(v110IsEarly(s)&&st===9){let other9=v62Pool('ホール').some(x=>x.id!==s.id&&schedule[k]?.[x.id]?.start===9&&v62SetupSkill(x));if(other9)st=11;}if(en-st>9)en=st+9;return en>st?[st,en]:null;}
+function v110SeedAll(){for(let d of dates){let k=ymd(d);schedule[k]??={};for(let s of v62Pool('ホール')){if(schedule[k]?.[s.id]||!v110NormalAvailable(s,d)||v73EmpOff(s,k))continue;let p=v110DefaultPattern(s,d);if(!p||!v110StartAllowed(s,k,p[0])||!v73MaxConsecOk(s.id,k)||!v73AllowedShift(s,d,p[0],p[1],true))continue;schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};}}}
+function v110SameGroup(s){return v62Pool('ホール').filter(x=>x.id!==s.id&&staffCategory(x)===staffCategory(s)&&x.rank===s.rank&&Number(x.bs)===Number(s.bs)&&Number(x.be)===Number(s.be));}
+function v110RequestedDays(s){return v75RequestedWorkDays(s);}
+function v110RemovalScore(s,k,d,cut){if(s.employment==='社員')return -999999;let p=schedule[k]?.[s.id],score=0,hrs=v75AssignedHours(s),days=v109AssignedDays(s),r=reqObj(s.id,k),pow=v85RankPower(s);
+ if(p?.start===9&&v62SetupSkill(s))score-=4000;if(s.closePriority)score-=1800;
+ // ランクは営業力を満たした後の同条件比較で使う。高ランクだから何人も保護しない。
+ score+=(1.0-pow)*180;
+ // 月間勤務量が多いほど削り候補。同条件グループ内の偏りを強く補正。
+ score+=hrs*4+days*16;let peers=v110SameGroup(s);if(peers.length){let avg=peers.reduce((z,x)=>z+v75AssignedHours(x),0)/peers.length;if(hrs>avg+6)score+=(hrs-avg)*18;else if(hrs<avg-6)score-=(avg-hrs)*18;}
+ // 同じ人ばかり削らない。
+ score-=(cut[s.id]||0)*650;
+ if(v110IsStudent(s)){let req=v110RequestedDays(s);score+=req*40; // 希望が多い学生ほど調整しやすい
+   if(req<=5)score-=700; // 少ない希望は強く尊重
+   if((s.skills||[]).includes('ドリバ'))score-=180;if((s.skills||[]).includes('ドリバ締め'))score-=220;
+ } else if(v110IsLifeFree(s)){score-=450; // 生活主軸。ただし絶対保護ではない
+ } else if(v110IsEarly(s)){let early=v62Pool('ホール').filter(v110IsEarly),avg=early.reduce((z,x)=>z+v75AssignedHours(x),0)/Math.max(1,early.length);if(hrs<avg)score-=350;}
+ if(r.m==='△')score+=5000; // △はほぼ休み。入っているなら最初に外したい
+ return score;}
+function v110CanRemove(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;delete schedule[k][s.id];let ok=v110DayIssues(k,d).length===0;schedule[k][s.id]=old;return ok;}
+function v110TrimDay(k,d,cut){let guard=0;while(guard++<80){let c=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員'&&v110CanRemove(s,k,d));if(!c.length)break;c.sort((a,b)=>v110RemovalScore(b,k,d,cut)-v110RemovalScore(a,k,d,cut));let s=c[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v110AddBest(k,d,n,allowDelta=false){let pool=v62Pool('ホール').filter(s=>!schedule[k]?.[s.id]&&!v73EmpOff(s,k)&&(allowDelta?v110EmergencyAvailable(s,d):v110NormalAvailable(s,d)));let needB=n.a>=11&&!v110HasPartTimeB(k,n.a,n.b),needDrink=n.a>=11&&!v110HasDriba(k,n.a,n.b);let cand=[];
+ for(let s of pool){if(v110IsStudent(s)&&!v76StudentRequested(s,k))continue;for(let p of v110PatternPool(s,d,n)){let [st,en]=p;if(st>=n.b||en<=n.a||!v73CanAdd(k,s,d,st,en,'ホール',true))continue;let sc=v85CandidateScore(s,k,d,n);if(needB&&v110IsPartTimeB(s))sc+=5000;if(needDrink&&(s.skills||[]).includes('ドリバ'))sc+=3800;if(v110IsLifeFree(s))sc+=400-Math.min(300,v75AssignedHours(s)*2);if(v110IsStudent(s)){sc+=700-v110RequestedDays(s)*28-v109AssignedDays(s)*22;if(v110RequestedDays(s)<=5)sc+=500;}let peers=v110SameGroup(s);if(peers.length){let avg=peers.reduce((z,x)=>z+v75AssignedHours(x),0)/peers.length;if(v75AssignedHours(s)<avg)sc+=(avg-v75AssignedHours(s))*16;}if(allowDelta)sc-=6000;cand.push({s,p,sc});}}
+ cand.sort((a,b)=>b.sc-a.sc);if(!cand.length)return false;let x=cand[0];v73Add(k,x.s,x.p[0],x.p[1]);return true;}
+function v110RepairDay(k,d){let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');v76EnsureEarlyEmployee(k,d,pool,'ホール');
+ for(let n of v62Blocks(d)){let guard=0;while(guard++<24&&!v110BlockOkay(k,d,n)){if(v110AddBest(k,d,n,false))continue; // 通常出勤可能者だけで無理なら△を非常用に使う
+   if(v110AddBest(k,d,n,true))continue;break;}}
+ v85EnsureClosing(k,d,pool,'ホール');
+ // 締め補修後に日中を壊していないか再確認
+ for(let n of v62Blocks(d)){let guard=0;while(guard++<10&&!v110BlockOkay(k,d,n)){if(!v110AddBest(k,d,n,false)&&!v110AddBest(k,d,n,true))break;}}
+}
+function v110RepairConsecutive(){for(let s of v62Pool('ホール')){let max=Number(s.max||5),run=[];for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id])run.push(d);else run=[];if(run.length>max){let opts=run.slice().filter(x=>v110CanRemove(s,ymd(x),x)).sort((a,b)=>v110RemovalScore(s,ymd(b),b,{})-v110RemovalScore(s,ymd(a),a,{}));if(opts.length){delete schedule[ymd(opts[0])][s.id];run=[];}}}}}
+function v110MonthlyRebalance(){// 同条件グループで極端な差が出たら、1日ずつ入替を試す
+ let pool=v62Pool('ホール').filter(s=>s.employment!=='社員'&&!v110IsStudent(s));for(let loop=0;loop<80;loop++){let changed=false;for(let low of pool){let peers=v110SameGroup(low);if(!peers.length)continue;let high=peers.sort((a,b)=>v75AssignedHours(b)-v75AssignedHours(a))[0];if(v75AssignedHours(high)-v75AssignedHours(low)<12)continue;for(let d of dates){let k=ymd(d),ph=schedule[k]?.[high.id];if(!ph||schedule[k]?.[low.id]||!v110NormalAvailable(low,d)||v73EmpOff(low,k))continue;let old=ph;delete schedule[k][high.id];let ok=false;for(let p of v110PatternPool(low,d,{a:ph.start,b:ph.end,min:0})){if(p[0]>=ph.end||p[1]<=ph.start||!v73AllowedShift(low,d,p[0],p[1],true))continue;schedule[k][low.id]={label:String(p[0]),start:p[0],end:p[1]};if(v110DayIssues(k,d).length===0){ok=true;break;}delete schedule[k][low.id];}if(ok){changed=true;break;}schedule[k][high.id]=old;}if(changed)break;}if(!changed)break;}}
+function v110Validate(){let out=[];for(let d of dates)out.push(...v110DayIssues(ymd(d),d));for(let s of v62Pool('ホール')){let run=0;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]){run++;if(run>Number(s.max||5))out.push(`${s.name}: 最大連勤超過`);}else run=0;}}for(let s of v62Pool('ホール').filter(s=>s.employment==='社員')){let off=dates.length-monthScheduledDaysFor(s.id);if(off!==8)out.push(`${s.name}: 社員休み${off}日`);}return [...new Set(out)];}
+function v110AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{
+  v106AutoHallFinal(); // 社員休み・締め等の既存絶対条件を土台にする
+  v110SeedAll();
+  for(let d of dates)v110RepairDay(ymd(d),d);
+  let cut={};for(let d of dates)v110TrimDay(ymd(d),d,cut);
+  v110RepairConsecutive();for(let d of dates)v110RepairDay(ymd(d),d);
+  v110MonthlyRebalance();
+  cut={};for(let d of dates)v110TrimDay(ymd(d),d,cut);
+  v110RepairConsecutive();for(let d of dates)v110RepairDay(ymd(d),d);
+}finally{window.alert=realAlert;}quickSave();renderAll();let q=v110Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v110AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v110AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v110AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v110Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v110 =====
+</script>
+
+
+<script>
+// ===== v111 ロジック精密化：時間帯主軸リレー・学生/フリー両立・既存勤務の移動補修 =====
+function v111CompositionOkay(k,d,n){if(n.a<11)return true;let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),hybA=active.filter(s=>!v110FullHall(s)&&s.rank==='A').length;let A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length,D=full.filter(s=>s.rank==='D').length;if(!active.some(v110IsPartTimeB))return false;let cnt=active.length;
+ // ホール専任Aが複数ならBと合わせて少人数でも強い。
+ if(A>=2)return cnt>=n.min;
+ // A+B。C以上がいれば基準人数、D中心なら1人厚くする。
+ if(A>=1&&B>=1){if(C>=1||B>=2)return cnt>=n.min;return cnt>=n.min+1;}
+ // 佐野のような兼任Aは0.5相当。Bが2人、またはB+Cがいれば昼の軸になれる。
+ if(hybA>=1){if(B>=2)return cnt>=n.min;if(B>=1&&C>=1)return cnt>=n.min;if(B>=1)return cnt>=n.min+1;}
+ // A不在時。昼3人帯ならB+C+C程度、夜4人帯ならB+C+C+D+D程度が目安。
+ if(B>=2)return cnt>=n.min;
+ if(B>=1&&C>=2)return cnt>=Math.max(n.min,n.min>=4?5:3);
+ if(B>=1&&C>=1)return cnt>=Math.max(n.min,n.min>=4?5:4);
+ return false;}
+function v111WeekendExtra(k,d,n){if(!v62Weekend(d)||n.a<11)return 0;let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length; // 基本+1、低ランク寄りなら+2
+ if(A===0&&B<=1&&C<=1)return 2;if(A===1&&B===1&&C===0)return 2;return 1;}
+function v111Target(k,d,n){return n.min+v111WeekendExtra(k,d,n);}
+function v111BlockOkay(k,d,n){let count=v110BlockPeople(k,n.a,n.b).length;if(count<v111Target(k,d,n))return false;if(n.a>=11&&!v111CompositionOkay(k,d,n))return false;if(n.a>=11&&!v110HasDriba(k,n.a,n.b))return false;return true;}
+function v111DayIssues(k,d){let out=[],pool=v62Pool('ホール'),nine=pool.filter(s=>schedule[k]?.[s.id]?.start===9);if(nine.length!==1)out.push(`${k}: 9時入り${nine.length}人`);if(nine.length===1&&!v62SetupSkill(nine[0]))out.push(`${k}: セッティングスキルなし`);for(let s of pool){let p=schedule[k]?.[s.id];if(!p)continue;let r=reqObj(s.id,k);if(p.start===10)out.push(`${k}: ${s.name} ホール10時入り`);if(!v110StartAllowed(s,k,p.start))out.push(`${k}: ${s.name} 18時以降の通常出勤`);if(r.m==='×')out.push(`${k}: ${s.name}休み希望違反`);if(s.input==='work'&&!(r.m==='○'||r.m==='時間'))out.push(`${k}: ${s.name}出勤希望なし`);if(!v62TimeReqOk(s,d,p.start,p.end))out.push(`${k}: ${s.name}時間希望違反`);}for(let n of v62Blocks(d)){let count=v110BlockPeople(k,n.a,n.b).length,target=v111Target(k,d,n);if(count<target)out.push(`${k}: ${n.a}-${n.b} 人数不足 ${count}/${target}`);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} バイトB以上不在`);if(n.a>=11&&!v111CompositionOkay(k,d,n))out.push(`${k}: ${n.a}-${n.b} 戦力構成NG`);if(n.a>=11&&!v110HasDriba(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} ドリバ不在`);if(!v85TraineeMentored(k,n.a,n.b,'ホール'))out.push(`${k}: ${n.a}-${n.b} 育成主軸不足`);}if(!v68EmployeeCovers(k,d,11,13,'ホール'))out.push(`${k}: 11時台に社員なし`);if(!v62CloseOk(k,d,'ホール'))out.push(`${k}: 閉店条件NG`);return [...new Set(out)];}
+function v111CanRemove(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;delete schedule[k][s.id];let ok=v111DayIssues(k,d).length===0;schedule[k][s.id]=old;return ok;}
+function v111TryMoveScheduled(k,d,n){let baseDay=JSON.parse(JSON.stringify(schedule[k]||{})),baseIssues=v111DayIssues(k,d),best=null;let pool=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定'&&!v110IsStudent(s));for(let s of pool){let old=baseDay[s.id];for(let p of v110PatternPool(s,d,n)){let [st,en]=p;if(st>=n.b||en<=n.a||!v73AllowedShift(s,d,st,en,true))continue;schedule[k]=JSON.parse(JSON.stringify(baseDay));schedule[k][s.id]={label:String(st),start:st,end:en};if(!v111BlockOkay(k,d,n))continue;let iss=v111DayIssues(k,d); // 対象ブロックを直し、全体の警告を増やさない移動だけ採用
+ let sc=iss.length*100+(Math.abs(st-old.start)+Math.abs(en-old.end));if((iss.length<=baseIssues.length)&&(!best||sc<best.sc))best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}
+schedule[k]=best?best.day:baseDay;return !!best;}
+function v111AddBest(k,d,n,allowDelta=false){let pool=v62Pool('ホール').filter(s=>!schedule[k]?.[s.id]&&!v73EmpOff(s,k)&&(allowDelta?v110EmergencyAvailable(s,d):v110NormalAvailable(s,d))),needB=n.a>=11&&!v110HasPartTimeB(k,n.a,n.b),needDrink=n.a>=11&&!v110HasDriba(k,n.a,n.b),cand=[];for(let s of pool){if(v110IsStudent(s)&&!v76StudentRequested(s,k))continue;for(let p of v110PatternPool(s,d,n)){let [st,en]=p;if(st>=n.b||en<=n.a||!v73CanAdd(k,s,d,st,en,'ホール',true))continue;let sc=v85CandidateScore(s,k,d,n);if(needB&&v110IsPartTimeB(s))sc+=5200;if(needDrink&&(s.skills||[]).includes('ドリバ'))sc+=4000;if(v110IsLifeFree(s))sc+=450-Math.min(300,v75AssignedHours(s)*2);if(v110IsStudent(s)){let req=v110RequestedDays(s);sc+=800-req*30-v109AssignedDays(s)*25;if(req<=5)sc+=650;if((s.skills||[]).includes('ドリバ'))sc+=250;if((s.skills||[]).includes('ドリバ締め'))sc+=300;}if(allowDelta)sc-=7000;cand.push({s,p,sc});}}cand.sort((a,b)=>b.sc-a.sc);if(!cand.length)return false;let x=cand[0];v73Add(k,x.s,x.p[0],x.p[1]);return true;}
+function v111RepairDay(k,d){let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');v76EnsureEarlyEmployee(k,d,pool,'ホール');for(let n of v62Blocks(d)){let guard=0;while(guard++<28&&!v111BlockOkay(k,d,n)){if(v111TryMoveScheduled(k,d,n))continue;if(v111AddBest(k,d,n,false))continue;if(v111AddBest(k,d,n,true))continue;break;}}v85EnsureClosing(k,d,pool,'ホール');for(let n of v62Blocks(d)){let guard=0;while(guard++<12&&!v111BlockOkay(k,d,n)){if(v111TryMoveScheduled(k,d,n))continue;if(v111AddBest(k,d,n,false)||v111AddBest(k,d,n,true))continue;break;}}}
+function v111TrimDay(k,d,cut){let guard=0;while(guard++<80){let c=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員'&&v111CanRemove(s,k,d));if(!c.length)break;c.sort((a,b)=>v110RemovalScore(b,k,d,cut)-v110RemovalScore(a,k,d,cut));let s=c[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v111SwapStudents(){let studs=v62Pool('ホール').filter(v110IsStudent).sort((a,b)=>v110RequestedDays(a)-v110RequestedDays(b));for(let low of studs){for(let high of studs.slice().sort((a,b)=>v110RequestedDays(b)-v110RequestedDays(a))){if(low.id===high.id||v110RequestedDays(low)>=v110RequestedDays(high))continue;if(v109AssignedDays(low)>=v109AssignedDays(high))continue;let done=false;for(let d of dates){let k=ymd(d),ph=schedule[k]?.[high.id];if(!ph||schedule[k]?.[low.id]||!v76StudentRequested(low,k))continue;let base=JSON.parse(JSON.stringify(schedule[k]||{}));delete schedule[k][high.id];for(let p of v85StudentPatterns(low,d)){if(!p||Number(p[0])>18||!v73AllowedShift(low,d,p[0],p[1],true))continue;schedule[k][low.id]={label:String(p[0]),start:Number(p[0]),end:Number(p[1])};if(v111DayIssues(k,d).length===0){done=true;break;}delete schedule[k][low.id];}if(done)break;schedule[k]=base;}if(done)break;}}}
+function v111BalanceFreeStudent(){let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(!life.length||!stud.length)return;for(let loop=0;loop<100;loop++){let lowF=life.slice().sort((a,b)=>v75AssignedHours(a)-v75AssignedHours(b))[0],highS=stud.slice().sort((a,b)=>v75AssignedHours(b)-v75AssignedHours(a)||v110RequestedDays(b)-v110RequestedDays(a))[0];if(v75AssignedHours(highS)<v75AssignedHours(lowF))break;let changed=false;
+ // まずフリーターの既存勤務を13時開始等へ伸ばし、主軸として使う
+ for(let d of dates){let k=ymd(d),old=schedule[k]?.[lowF.id];if(!old)continue;for(let p of v110PatternPool(lowF,d,{a:13,b:20,min:0})){if(p[0]>old.start||p[1]<old.end||!v73AllowedShift(lowF,d,p[0],p[1],true))continue;let base={...old};schedule[k][lowF.id]={label:String(p[0]),start:p[0],end:p[1]};if(v111DayIssues(k,d).length===0&&p[1]-p[0]>base.end-base.start){changed=true;break;}schedule[k][lowF.id]=base;}if(changed)break;}
+ if(changed)continue;
+ // 伸ばせなければ希望の多い学生を、営業が成立する日だけ1日調整
+ let candidates=stud.slice().sort((a,b)=>v110RequestedDays(b)-v110RequestedDays(a)||v75AssignedHours(b)-v75AssignedHours(a));for(let s of candidates){for(let d of dates){let k=ymd(d);if(!schedule[k]?.[s.id]||!v111CanRemove(s,k,d))continue;delete schedule[k][s.id];changed=true;break;}if(changed)break;}if(!changed)break;}
+}
+function v111RepairConsecutive(){for(let s of v62Pool('ホール')){let max=Number(s.max||5),run=[];for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id])run.push(d);else run=[];if(run.length>max){let opts=run.filter(x=>v111CanRemove(s,ymd(x),x)).sort((a,b)=>v110RemovalScore(s,ymd(b),b,{})-v110RemovalScore(s,ymd(a),a,{}));if(opts.length){delete schedule[ymd(opts[0])][s.id];run=[];}}}}}
+function v111Validate(){let out=[];for(let d of dates)out.push(...v111DayIssues(ymd(d),d));for(let s of v62Pool('ホール')){let run=0;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]){run++;if(run>Number(s.max||5))out.push(`${s.name}: 最大連勤超過`);}else run=0;}}for(let s of v62Pool('ホール').filter(s=>s.employment==='社員')){let off=dates.length-monthScheduledDaysFor(s.id);if(off!==8)out.push(`${s.name}: 社員休み${off}日`);}let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(life.length&&stud.length){let minF=Math.min(...life.map(v75AssignedHours)),maxS=Math.max(...stud.map(v75AssignedHours));if(maxS>=minF)out.push(`学生勤務時間${maxS}hがフリー主軸最少${minF}h以上`);}return [...new Set(out)];}
+function v111AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v106AutoHallFinal();v110SeedAll();for(let d of dates)v111RepairDay(ymd(d),d);let cut={};for(let d of dates)v111TrimDay(ymd(d),d,cut);v111RepairConsecutive();for(let d of dates)v111RepairDay(ymd(d),d);v110MonthlyRebalance();v111SwapStudents();v111BalanceFreeStudent();for(let d of dates)v111RepairDay(ymd(d),d);cut={};for(let d of dates)v111TrimDay(ymd(d),d,cut);v111RepairConsecutive();for(let d of dates)v111RepairDay(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v111Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v111AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v111AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v111AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v111Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v111 =====
+</script>
+
+
+<script>
+// ===== v112 可動時間の意味を設定どおりに解釈 =====
+function v112CompositionOkay(k,d,n){if(n.a<11)return true;let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),hybA=active.filter(s=>!v110FullHall(s)&&s.rank==='A').length;let A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length;if(!active.some(v110IsPartTimeB))return false;let cnt=active.length;
+ if(A>=2)return cnt>=n.min;
+ if(A>=1&&B>=1){if(C>=1||B>=2)return cnt>=n.min;return cnt>=n.min+1;}
+ // 兼任A＋バイトBがいれば、Dが混ざっても昼の最低人数帯は成立。D+D＋兼任AだけはB不在で上で弾く。
+ if(hybA>=1&&B>=1)return cnt>=n.min;
+ if(B>=2)return cnt>=n.min;
+ if(B>=1&&C>=2)return cnt>=Math.max(n.min,n.min>=4?5:3);
+ if(B>=1&&C>=1)return cnt>=Math.max(n.min,n.min>=4?5:4);
+ return false;}
+function v112WeekendExtra(k,d,n){if(!v62Weekend(d)||n.a<11)return 0;if(n.a>=20)return 1;let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length;if(A===0&&B<=1&&C<=1)return 2;if(A===1&&B===1&&C===0)return 2;return 1;}
+function v112Target(k,d,n){return n.min+v112WeekendExtra(k,d,n);}
+function v112BlockOkay(k,d,n){let count=v110BlockPeople(k,n.a,n.b).length;if(count<v112Target(k,d,n))return false;if(n.a>=11&&!v112CompositionOkay(k,d,n))return false;if(n.a>=11&&!v110HasDriba(k,n.a,n.b))return false;return true;}
+function v112AllowedShift(s,d,st,en){let k=ymd(d),r=reqObj(s.id,k),mode=v68MainMode(s),cat=staffCategory(s),close=v62Close(d);st=Number(st);en=Number(en);if(!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>9||st===10||!v110StartAllowed(s,k,st)||en>close)return false;if(v62Weekend(d)&&s.weekend===false)return false;if(r.m==='×')return false;if(s.input==='work'&&!(r.m==='○'||r.m==='時間'))return false;if(!v62TimeReqOk(s,d,st,en))return false;
+ let bs=Number(s.bs),be=Math.min(Number(s.be),close);
+ if(mode==='時間固定')return st===bs&&en===be;
+ if(mode==='出勤固定')return st===bs&&en>=Math.min(be,st+1)&&en<=Math.max(be,close);
+ if(mode==='退勤固定')return en===be&&st>=9;
+ if(s.employment==='社員')return st>=11&&st<=14&&en-st>=7&&en-st<=9;
+ if(v110IsStudent(s)){let ps=v85StudentPatterns(s,d).map(p=>Number(p[0])+'-'+Number(p[1]));return ps.includes(st+'-'+en);}
+ if(cat==='バイト 早番'){return st>=bs&&st<=Math.min(13,be-1)&&en<=be;}
+ if(v110IsLifeFree(s)){let minStart=13;if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)minStart=Math.min(minStart,Number(s.os));return st>=minStart&&st<=18&&en>=Math.min(be,st+3);}
+ return true;}
+function v112PatternPool(s,d,n){let k=ymd(d),close=v62Close(d),mode=v68MainMode(s),cat=staffCategory(s),out=[];if(v110IsStudent(s))out=v85StudentPatterns(s,d).map(p=>[Number(p[0]),Number(p[1])]);else if(mode==='時間固定')out=[[Number(s.bs),Math.min(Number(s.be),close)]];else if(mode==='出勤固定'){let st=Number(s.bs);for(let en of [Number(s.be),20,22,close])if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}else if(s.employment==='社員'){for(let p of [[11,20],[12,21],[13,22],[14,close],[13,close]])if(p[1]>p[0]&&p[1]-p[0]>=7&&p[1]-p[0]<=9&&p[1]<=close)out.push(p);}else if(cat==='バイト 早番'){let bs=Number(s.bs),be=Math.min(Number(s.be),close);for(let st of [bs,11,12,13])if(st>=bs&&st<be){for(let en of [be,Math.min(be,st+9)])if(en>st)out.push([st,en]);}}else if(v110IsLifeFree(s)){let starts=[13,14,15,16,17,18,Number(s.bs)];if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)starts.push(Number(s.os));for(let st of starts){for(let en of [20,22,close,Number(s.be)])if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}}
+ let seen=new Set();return out.filter(p=>{let key=p[0]+'-'+p[1];if(seen.has(key)||!v112AllowedShift(s,d,p[0],p[1]))return false;seen.add(key);return true;});}
+function v112DayIssues(k,d){let out=[],pool=v62Pool('ホール'),nine=pool.filter(s=>schedule[k]?.[s.id]?.start===9);if(nine.length!==1)out.push(`${k}: 9時入り${nine.length}人`);if(nine.length===1&&!v62SetupSkill(nine[0]))out.push(`${k}: セッティングスキルなし`);for(let s of pool){let p=schedule[k]?.[s.id];if(!p)continue;let r=reqObj(s.id,k);if(p.start===10)out.push(`${k}: ${s.name} ホール10時入り`);if(!v112AllowedShift(s,d,p.start,p.end))out.push(`${k}: ${s.name} 勤務時間条件違反`);if(r.m==='×')out.push(`${k}: ${s.name}休み希望違反`);}for(let n of v62Blocks(d)){let count=v110BlockPeople(k,n.a,n.b).length,target=v112Target(k,d,n);if(count<target)out.push(`${k}: ${n.a}-${n.b} 人数不足 ${count}/${target}`);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} バイトB以上不在`);if(n.a>=11&&!v112CompositionOkay(k,d,n))out.push(`${k}: ${n.a}-${n.b} 戦力構成NG`);if(n.a>=11&&!v110HasDriba(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} ドリバ不在`);if(!v85TraineeMentored(k,n.a,n.b,'ホール'))out.push(`${k}: ${n.a}-${n.b} 育成主軸不足`);}if(!v68EmployeeCovers(k,d,11,13,'ホール'))out.push(`${k}: 11時台に社員なし`);if(!v62CloseOk(k,d,'ホール'))out.push(`${k}: 閉店条件NG`);return [...new Set(out)];}
+function v112FixEarlyEmployee(k,d){if(v68EmployeeCovers(k,d,11,13,'ホール'))return true;let emps=v62Pool('ホール').filter(s=>s.employment==='社員'&&schedule[k]?.[s.id]&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定').sort((a,b)=>(a.closePriority?1:0)-(b.closePriority?1:0)||v75AssignedHours(a)-v75AssignedHours(b));let base=JSON.parse(JSON.stringify(schedule[k]||{})),best=null;for(let s of emps){for(let p of [[11,20],[11,19]]){if(!v112AllowedShift(s,d,p[0],p[1]))continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:'11',start:11,end:p[1]};let iss=v112DayIssues(k,d);let sc=iss.length+(s.closePriority?10:0);if(!best||sc<best.sc)best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}schedule[k]=best?best.day:base;return !!best;}
+function v112TryMoveScheduled(k,d,n){let base=JSON.parse(JSON.stringify(schedule[k]||{})),before=v112DayIssues(k,d),best=null;for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&!v110IsStudent(s)&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定')){let old=base[s.id];for(let p of v112PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};if(!v112BlockOkay(k,d,n))continue;let iss=v112DayIssues(k,d),sc=iss.length*100+Math.abs(p[0]-old.start)+Math.abs(p[1]-old.end);if(iss.length<=before.length&&(!best||sc<best.sc))best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}
+schedule[k]=best?best.day:base;return !!best;}
+function v112AddBest(k,d,n,delta=false){let pool=v62Pool('ホール').filter(s=>!schedule[k]?.[s.id]&&!v73EmpOff(s,k)&&(delta?v110EmergencyAvailable(s,d):v110NormalAvailable(s,d))),cand=[],needB=n.a>=11&&!v110HasPartTimeB(k,n.a,n.b),needDrink=n.a>=11&&!v110HasDriba(k,n.a,n.b);for(let s of pool){if(v110IsStudent(s)&&!v76StudentRequested(s,k))continue;for(let p of v112PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;let sc=v85CandidateScore(s,k,d,n);if(needB&&v110IsPartTimeB(s))sc+=6000;if(needDrink&&(s.skills||[]).includes('ドリバ'))sc+=4500;if(v110IsLifeFree(s))sc+=500-Math.min(350,v75AssignedHours(s)*2);if(v110IsStudent(s)){let req=v110RequestedDays(s);sc+=850-req*32-v109AssignedDays(s)*28;if(req<=5)sc+=750;if((s.skills||[]).includes('ドリバ'))sc+=300;if((s.skills||[]).includes('ドリバ締め'))sc+=350;}if(delta)sc-=8000;cand.push({s,p,sc});}}cand.sort((a,b)=>b.sc-a.sc);if(!cand.length)return false;let x=cand[0];schedule[k][x.s.id]={label:String(x.p[0]),start:x.p[0],end:x.p[1]};return true;}
+function v112RepairDay(k,d){v112FixEarlyEmployee(k,d);let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');for(let n of v62Blocks(d)){let g=0;while(g++<30&&!v112BlockOkay(k,d,n)){if(v112TryMoveScheduled(k,d,n))continue;if(v112AddBest(k,d,n,false))continue;if(v112AddBest(k,d,n,true))continue;break;}}v85EnsureClosing(k,d,pool,'ホール');v112FixEarlyEmployee(k,d);for(let n of v62Blocks(d)){let g=0;while(g++<15&&!v112BlockOkay(k,d,n)){if(v112TryMoveScheduled(k,d,n)||v112AddBest(k,d,n,false)||v112AddBest(k,d,n,true))continue;break;}}}
+function v112CanRemove(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;delete schedule[k][s.id];let ok=v112DayIssues(k,d).length===0;schedule[k][s.id]=old;return ok;}
+function v112TrimDay(k,d,cut){let g=0;while(g++<80){let c=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員'&&v112CanRemove(s,k,d));if(!c.length)break;c.sort((a,b)=>v110RemovalScore(b,k,d,cut)-v110RemovalScore(a,k,d,cut));let s=c[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v112SwapScarceStudents(){let studs=v62Pool('ホール').filter(v110IsStudent).sort((a,b)=>v110RequestedDays(a)-v110RequestedDays(b));for(let low of studs){if(v109AssignedDays(low)>=v110RequestedDays(low))continue;for(let d of dates){let k=ymd(d);if(schedule[k]?.[low.id]||!v76StudentRequested(low,k))continue;let highs=studs.filter(s=>schedule[k]?.[s.id]&&v110RequestedDays(s)>v110RequestedDays(low)).sort((a,b)=>v110RequestedDays(b)-v110RequestedDays(a));for(let high of highs){let base=JSON.parse(JSON.stringify(schedule[k]||{}));delete schedule[k][high.id];for(let p of v112PatternPool(low,d,{a:17,b:v62Close(d),min:0})){schedule[k][low.id]={label:String(p[0]),start:p[0],end:p[1]};if(v112DayIssues(k,d).length===0){base=null;break;}delete schedule[k][low.id];}if(base===null)break;schedule[k]=base;}if(schedule[k]?.[low.id])break;}}}
+function v112BalanceFreeStudent(){let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(!life.length||!stud.length)return;for(let loop=0;loop<120;loop++){let lf=life.slice().sort((a,b)=>v75AssignedHours(a)-v75AssignedHours(b))[0],ss=stud.slice().sort((a,b)=>v75AssignedHours(b)-v75AssignedHours(a)||v110RequestedDays(b)-v110RequestedDays(a))[0];if(v75AssignedHours(ss)<v75AssignedHours(lf))break;let changed=false;
+ // フリーの既存日を長くできるなら13〜20/22へ伸ばす。
+ for(let d of dates){let k=ymd(d),old=schedule[k]?.[lf.id];if(!old)continue;let opts=v112PatternPool(lf,d,{a:13,b:v62Close(d),min:0}).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]));for(let p of opts){if(p[1]-p[0]<=old.end-old.start)continue;let base={...old};schedule[k][lf.id]={label:String(p[0]),start:p[0],end:p[1]};if(v112DayIssues(k,d).length===0){changed=true;break;}schedule[k][lf.id]=base;}if(changed)break;}
+ if(changed)continue;
+ // それでも学生が上なら、希望の多い学生を成立する日だけ1日削る。
+ for(let s of stud.slice().sort((a,b)=>v110RequestedDays(b)-v110RequestedDays(a)||v75AssignedHours(b)-v75AssignedHours(a))){for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]&&v112CanRemove(s,k,d)){delete schedule[k][s.id];changed=true;break;}}if(changed)break;}if(!changed)break;}
+}
+function v112Validate(){let out=[];for(let d of dates)out.push(...v112DayIssues(ymd(d),d));for(let s of v62Pool('ホール')){let run=0;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]){run++;if(run>Number(s.max||5))out.push(`${s.name}: 最大連勤超過`);}else run=0;}}for(let s of v62Pool('ホール').filter(s=>s.employment==='社員')){let off=dates.length-monthScheduledDaysFor(s.id);if(off!==8)out.push(`${s.name}: 社員休み${off}日`);}let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(life.length&&stud.length){let minF=Math.min(...life.map(v75AssignedHours)),maxS=Math.max(...stud.map(v75AssignedHours));if(maxS>=minF)out.push(`学生勤務時間${maxS}hがフリー主軸最少${minF}h以上`);}return [...new Set(out)];}
+function v112AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v106AutoHallFinal();v110SeedAll();for(let d of dates)v112RepairDay(ymd(d),d);let cut={};for(let d of dates)v112TrimDay(ymd(d),d,cut);for(let d of dates)v112RepairDay(ymd(d),d);v110MonthlyRebalance();v112SwapScarceStudents();v112BalanceFreeStudent();for(let d of dates)v112RepairDay(ymd(d),d);cut={};for(let d of dates)v112TrimDay(ymd(d),d,cut);for(let d of dates)v112RepairDay(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v112Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v112AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v112AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v112AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v112Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v112 =====
+</script>
+
+
+<script>
+// ===== v113 最終整合：固定時間・締め・休日厚めを「実際に出られる人数」の範囲で成立 =====
+function v113StudentBaseStartOk(s,d,st){let k=ymd(d),r=reqObj(s.id,k);if(r.m==='時間'){
+  let ts=r.ts!==undefined&&r.ts!==''?Number(r.ts):null,h=r.h!==undefined&&r.h!==''?Number(r.h):null;if(ts!==null&&st<ts)return false;if(r.d==='from'&&h!==null&&st<h)return false;
+ }
+ if(v62Weekend(d)&&s.os!==''&&s.os!==undefined&&Number(s.os)>0)return st>=Number(s.os);
+ return st>=Number(s.bs);
+}
+function v113AllowedShift(s,d,st,en){let k=ymd(d),r=reqObj(s.id,k),mode=v68MainMode(s),cat=staffCategory(s),close=v62Close(d);st=Number(st);en=Number(en);if(!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>9||st===10||!v110StartAllowed(s,k,st)||en>close)return false;if(v62Weekend(d)&&s.weekend===false)return false;if(r.m==='×')return false;if(s.input==='work'&&!(r.m==='○'||r.m==='時間'))return false;if(!v62TimeReqOk(s,d,st,en))return false;let bs=Number(s.bs),be=Math.min(Number(s.be),close);
+ if(mode==='時間固定')return st===bs&&en===be;
+ if(v110IsStudent(s)){
+   if(mode==='出勤固定'&&st!==bs)return false;
+   if(!v113StudentBaseStartOk(s,d,st))return false;
+   // 締め可能者は、開始条件を守る限り23時まで延長可能。
+   if(en>be && !(s.close||v85HasClosingAbility(s)))return false;
+   return true;
+ }
+ if(mode==='出勤固定')return st===bs&&en>=Math.min(be,st+1)&&en<=Math.max(be,close);
+ if(mode==='退勤固定')return en===be;
+ if(s.employment==='社員')return st>=11&&st<=14&&en-st>=7&&en-st<=9;
+ if(cat==='バイト 早番')return st>=bs&&st<=Math.min(13,be-1)&&en<=be;
+ if(v110IsLifeFree(s)){let minStart=13;if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)minStart=Math.min(minStart,Number(s.os));return st>=minStart&&st<=18&&en>=Math.min(be,st+3);}
+ return true;}
+function v113PatternPool(s,d,n){let close=v62Close(d),mode=v68MainMode(s),cat=staffCategory(s),out=[];
+ if(v110IsStudent(s)){
+   let starts=[];let r=reqObj(s.id,ymd(d));if(r.m==='時間'){
+     if(r.ts!==undefined&&r.ts!=='')starts.push(Number(r.ts));else if(r.d==='from'&&r.h!=='')starts.push(Number(r.h));
+   }
+   if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)starts.push(Number(s.os));starts.push(Number(s.bs));
+   starts=[...new Set(starts.filter(Number.isFinite))];for(let st of starts){for(let en of [Number(s.be),22,close])if(en>st&&en-st<=9)out.push([st,en]);}
+ } else if(mode==='時間固定')out=[[Number(s.bs),Math.min(Number(s.be),close)]];
+ else if(mode==='出勤固定'){let st=Number(s.bs);for(let en of [Number(s.be),20,22,close])if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}
+ else if(s.employment==='社員'){for(let p of [[11,20],[12,21],[13,22],[14,close],[13,close]])if(p[1]>p[0]&&p[1]-p[0]>=7&&p[1]-p[0]<=9&&p[1]<=close)out.push(p);}
+ else if(cat==='バイト 早番'){let bs=Number(s.bs),be=Math.min(Number(s.be),close);for(let st of [bs,11,12,13])if(st>=bs&&st<be)out.push([st,be]);}
+ else if(v110IsLifeFree(s)){let starts=[13,14,15,16,17,18,Number(s.bs)];if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)starts.push(Number(s.os));for(let st of starts){for(let en of [20,22,close,Number(s.be)])if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}}
+ let seen=new Set();return out.filter(p=>{let key=p[0]+'-'+p[1];if(seen.has(key)||!v113AllowedShift(s,d,p[0],p[1]))return false;seen.add(key);return true;});}
+function v113FeasibleCount(d,n){let k=ymd(d),count=0;for(let s of v62Pool('ホール')){if(v73EmpOff(s,k)||!v110NormalAvailable(s,d))continue;let existing=schedule[k]?.[s.id];if(existing&&existing.start<n.b&&existing.end>n.a){count++;continue;}if(v113PatternPool(s,d,n).some(p=>p[0]<n.b&&p[1]>n.a))count++;}return count;}
+function v113Target(k,d,n){let desired=n.min+v112WeekendExtra(k,d,n),feasible=v113FeasibleCount(d,n);return Math.max(n.min,Math.min(desired,feasible));}
+function v113CompositionOkay(k,d,n){return v112CompositionOkay(k,d,n);}
+function v113BlockOkay(k,d,n){let count=v110BlockPeople(k,n.a,n.b).length;if(count<v113Target(k,d,n))return false;if(n.a>=11&&!v113CompositionOkay(k,d,n))return false;if(n.a>=11&&!v110HasDriba(k,n.a,n.b))return false;return true;}
+function v113NormalizeFixed(k,d){for(let s of v62Pool('ホール')){let p=schedule[k]?.[s.id];if(!p)continue;if(v113AllowedShift(s,d,p.start,p.end))continue;let mode=v68MainMode(s),best=null;
+   if(mode==='時間固定')best=[Number(s.bs),Math.min(Number(s.be),v62Close(d))];
+   else if(mode==='出勤固定')best=v113PatternPool(s,d,{a:Number(s.bs),b:Math.min(Number(s.be),v62Close(d)),min:0})[0]||null;
+   else {let opts=v113PatternPool(s,d,{a:p.start,b:p.end,min:0});best=opts.sort((a,b)=>Math.abs(a[0]-p.start)+Math.abs(a[1]-p.end)-Math.abs(b[0]-p.start)-Math.abs(b[1]-p.end))[0]||null;}
+   if(best)schedule[k][s.id]={label:String(best[0]),start:best[0],end:best[1]};else delete schedule[k][s.id];
+ }}
+function v113FixEarlyEmployee(k,d){if(v68EmployeeCovers(k,d,11,13,'ホール'))return true;let emps=v62Pool('ホール').filter(s=>s.employment==='社員'&&schedule[k]?.[s.id]&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定').sort((a,b)=>(a.closePriority?1:0)-(b.closePriority?1:0));for(let s of emps){for(let p of [[11,20],[11,19]])if(v113AllowedShift(s,d,p[0],p[1])){schedule[k][s.id]={label:'11',start:11,end:p[1]};return true;}}return false;}
+function v113ClosingDeficits(k,d){let close=v62Close(d),cls=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]?.end>=close);return {count:Math.max(0,3-cls.length),emp:!cls.some(s=>s.employment==='社員'),reg:!cls.some(v62RegSkill),drink:!cls.some(v62DrinkSkill)};}
+function v113EnsureClosing(k,d){let close=v62Close(d),guard=0;while(guard++<12){let def=v113ClosingDeficits(k,d);if(!def.count&&!def.emp&&!def.reg&&!def.drink)return true;let base=JSON.parse(JSON.stringify(schedule[k]||{})),best=null;for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id])){let old=base[s.id];if(old.end>=close||(!v85HasClosingAbility(s)&&!s.close))continue;for(let p of v113PatternPool(s,d,{a:Math.max(13,close-5),b:close,min:0}).filter(p=>p[1]===close)){schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};let nd=v113ClosingDeficits(k,d),gain=(def.count-nd.count)*5+(def.emp&&!nd.emp?4:0)+(def.reg&&!nd.reg?4:0)+(def.drink&&!nd.drink?4:0);if(gain>0&&(!best||gain>best.gain))best={day:JSON.parse(JSON.stringify(schedule[k])),gain};}}
+ schedule[k]=best?best.day:base;if(best)continue;
+ // 未配置者から締め可能者を追加
+ let cands=v62Pool('ホール').filter(s=>!schedule[k]?.[s.id]&&!v73EmpOff(s,k)&&v110NormalAvailable(s,d)&&(v85HasClosingAbility(s)||s.close));for(let s of cands){for(let p of v113PatternPool(s,d,{a:Math.max(13,close-5),b:close,min:0}).filter(p=>p[1]===close)){schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};break;}if(schedule[k]?.[s.id])break;}if(!cands.length)break;}
+ return v62CloseOk(k,d,'ホール');}
+function v113DayIssues(k,d){let out=[],pool=v62Pool('ホール'),nine=pool.filter(s=>schedule[k]?.[s.id]?.start===9);if(nine.length!==1)out.push(`${k}: 9時入り${nine.length}人`);if(nine.length===1&&!v62SetupSkill(nine[0]))out.push(`${k}: セッティングスキルなし`);for(let s of pool){let p=schedule[k]?.[s.id];if(!p)continue;let r=reqObj(s.id,k);if(p.start===10)out.push(`${k}: ${s.name} ホール10時入り`);if(!v113AllowedShift(s,d,p.start,p.end))out.push(`${k}: ${s.name} 勤務時間条件違反`);if(r.m==='×')out.push(`${k}: ${s.name}休み希望違反`);}for(let n of v62Blocks(d)){let count=v110BlockPeople(k,n.a,n.b).length,target=v113Target(k,d,n);if(count<target)out.push(`${k}: ${n.a}-${n.b} 人数不足 ${count}/${target}`);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} バイトB以上不在`);if(n.a>=11&&!v113CompositionOkay(k,d,n))out.push(`${k}: ${n.a}-${n.b} 戦力構成NG`);if(n.a>=11&&!v110HasDriba(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} ドリバ不在`);if(!v85TraineeMentored(k,n.a,n.b,'ホール'))out.push(`${k}: ${n.a}-${n.b} 育成主軸不足`);}if(!v68EmployeeCovers(k,d,11,13,'ホール'))out.push(`${k}: 11時台に社員なし`);if(!v62CloseOk(k,d,'ホール'))out.push(`${k}: 閉店条件NG`);return [...new Set(out)];}
+function v113TryMove(k,d,n){let base=JSON.parse(JSON.stringify(schedule[k]||{})),before=v113DayIssues(k,d),best=null;for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&!v110IsStudent(s)&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定')){let old=base[s.id];for(let p of v113PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};if(!v113BlockOkay(k,d,n))continue;let iss=v113DayIssues(k,d),sc=iss.length*100+Math.abs(p[0]-old.start)+Math.abs(p[1]-old.end);if(iss.length<=before.length&&(!best||sc<best.sc))best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}schedule[k]=best?best.day:base;return !!best;}
+function v113AddBest(k,d,n,delta=false){let pool=v62Pool('ホール').filter(s=>!schedule[k]?.[s.id]&&!v73EmpOff(s,k)&&(delta?v110EmergencyAvailable(s,d):v110NormalAvailable(s,d))),cand=[],needB=n.a>=11&&!v110HasPartTimeB(k,n.a,n.b),needDrink=n.a>=11&&!v110HasDriba(k,n.a,n.b);for(let s of pool){if(v110IsStudent(s)&&!v76StudentRequested(s,k))continue;for(let p of v113PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;let sc=v85CandidateScore(s,k,d,n);if(needB&&v110IsPartTimeB(s))sc+=6000;if(needDrink&&(s.skills||[]).includes('ドリバ'))sc+=4500;if(v110IsLifeFree(s))sc+=550-Math.min(350,v75AssignedHours(s)*2);if(v110IsStudent(s)){let req=v110RequestedDays(s);sc+=850-req*32-v109AssignedDays(s)*28;if(req<=5)sc+=800;if((s.skills||[]).includes('ドリバ'))sc+=320;if((s.skills||[]).includes('ドリバ締め'))sc+=380;}if(delta)sc-=9000;cand.push({s,p,sc});}}cand.sort((a,b)=>b.sc-a.sc);if(!cand.length)return false;let x=cand[0];schedule[k][x.s.id]={label:String(x.p[0]),start:x.p[0],end:x.p[1]};return true;}
+function v113RepairDay(k,d){v113NormalizeFixed(k,d);v113FixEarlyEmployee(k,d);let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');for(let n of v62Blocks(d)){let g=0;while(g++<30&&!v113BlockOkay(k,d,n)){if(v113TryMove(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v113EnsureClosing(k,d);v113NormalizeFixed(k,d);v113FixEarlyEmployee(k,d);for(let n of v62Blocks(d)){let g=0;while(g++<15&&!v113BlockOkay(k,d,n)){if(v113TryMove(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v113EnsureClosing(k,d);}
+function v113CanRemove(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;delete schedule[k][s.id];let ok=v113DayIssues(k,d).length===0;schedule[k][s.id]=old;return ok;}
+function v113TrimDay(k,d,cut){let g=0;while(g++<80){let c=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員'&&v113CanRemove(s,k,d));if(!c.length)break;c.sort((a,b)=>v110RemovalScore(b,k,d,cut)-v110RemovalScore(a,k,d,cut));let s=c[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v113BalanceFreeStudent(){let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(!life.length||!stud.length)return;for(let loop=0;loop<80;loop++){let lf=life.slice().sort((a,b)=>v75AssignedHours(a)-v75AssignedHours(b))[0],ss=stud.slice().sort((a,b)=>v75AssignedHours(b)-v75AssignedHours(a)||v110RequestedDays(b)-v110RequestedDays(a))[0];if(v75AssignedHours(ss)<v75AssignedHours(lf))break;let changed=false;for(let d of dates){let k=ymd(d),old=schedule[k]?.[lf.id];if(!old)continue;for(let p of v113PatternPool(lf,d,{a:13,b:v62Close(d),min:0}).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))){if(p[1]-p[0]<=old.end-old.start)continue;let base={...old};schedule[k][lf.id]={label:String(p[0]),start:p[0],end:p[1]};if(v113DayIssues(k,d).length===0){changed=true;break;}schedule[k][lf.id]=base;}if(changed)break;}if(changed)continue;for(let s of stud.slice().sort((a,b)=>v110RequestedDays(b)-v110RequestedDays(a)||v75AssignedHours(b)-v75AssignedHours(a))){for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]&&v113CanRemove(s,k,d)){delete schedule[k][s.id];changed=true;break;}}if(changed)break;}if(!changed)break;}}
+function v113Validate(){let out=[];for(let d of dates)out.push(...v113DayIssues(ymd(d),d));for(let s of v62Pool('ホール')){let run=0;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]){run++;if(run>Number(s.max||5))out.push(`${s.name}: 最大連勤超過`);}else run=0;}}for(let s of v62Pool('ホール').filter(s=>s.employment==='社員')){let off=dates.length-monthScheduledDaysFor(s.id);if(off!==8)out.push(`${s.name}: 社員休み${off}日`);}let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(life.length&&stud.length){let minF=Math.min(...life.map(v75AssignedHours)),maxS=Math.max(...stud.map(v75AssignedHours));if(maxS>=minF)out.push(`学生勤務時間${maxS}hがフリー主軸最少${minF}h以上`);}return [...new Set(out)];}
+function v113AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v106AutoHallFinal();v110SeedAll();for(let pass=0;pass<3;pass++)for(let d of dates)v113RepairDay(ymd(d),d);let cut={};for(let d of dates)v113TrimDay(ymd(d),d,cut);for(let d of dates)v113RepairDay(ymd(d),d);v110MonthlyRebalance();v112SwapScarceStudents();v113BalanceFreeStudent();for(let pass=0;pass<2;pass++)for(let d of dates)v113RepairDay(ymd(d),d);cut={};for(let d of dates)v113TrimDay(ymd(d),d,cut);for(let d of dates)v113RepairDay(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v113Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v113AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v113AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v113AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v113Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v113 =====
+</script>
+
+
+<script>
+// ===== v114 警告原因を潰す最終補修 =====
+function v114CompositionOkay(k,d,n){if(n.a>=20){let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length;if(!active.some(v110IsPartTimeB))return false;return active.length>=n.min&&(A>=1||B>=2||C>=1);}return v112CompositionOkay(k,d,n);}
+function v114FeasibleCount(d,n){let k=ymd(d),count=0;for(let s of v62Pool('ホール')){if(v73EmpOff(s,k)||!v110NormalAvailable(s,d))continue;let existing=schedule[k]?.[s.id];if(existing&&existing.start<n.b&&existing.end>n.a){count++;continue;}if(!existing&&!v73MaxConsecOk(s.id,k))continue;if(v113PatternPool(s,d,n).some(p=>p[0]<n.b&&p[1]>n.a))count++;}return count;}
+function v114Target(k,d,n){let desired=n.min+v112WeekendExtra(k,d,n),feasible=v114FeasibleCount(d,n);return Math.max(n.min,Math.min(desired,feasible));}
+function v114BlockDefect(k,d,n){let c=v110BlockPeople(k,n.a,n.b).length,def=Math.max(0,v114Target(k,d,n)-c);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))def+=3;if(n.a>=11&&!v114CompositionOkay(k,d,n))def+=2;if(n.a>=11&&!v110HasDriba(k,n.a,n.b))def+=3;return def;}
+function v114BlockOkay(k,d,n){return v114BlockDefect(k,d,n)===0;}
+function v114DayIssues(k,d){let out=[],pool=v62Pool('ホール'),nine=pool.filter(s=>schedule[k]?.[s.id]?.start===9);if(nine.length!==1)out.push(`${k}: 9時入り${nine.length}人`);if(nine.length===1&&!v62SetupSkill(nine[0]))out.push(`${k}: セッティングスキルなし`);for(let s of pool){let p=schedule[k]?.[s.id];if(!p)continue;let r=reqObj(s.id,k);if(p.start===10)out.push(`${k}: ${s.name} ホール10時入り`);if(!v113AllowedShift(s,d,p.start,p.end))out.push(`${k}: ${s.name} 勤務時間条件違反`);if(r.m==='×')out.push(`${k}: ${s.name}休み希望違反`);}for(let n of v62Blocks(d)){let count=v110BlockPeople(k,n.a,n.b).length,target=v114Target(k,d,n);if(count<target)out.push(`${k}: ${n.a}-${n.b} 人数不足 ${count}/${target}`);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} バイトB以上不在`);if(n.a>=11&&!v114CompositionOkay(k,d,n))out.push(`${k}: ${n.a}-${n.b} 戦力構成NG`);if(n.a>=11&&!v110HasDriba(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} ドリバ不在`);if(!v85TraineeMentored(k,n.a,n.b,'ホール'))out.push(`${k}: ${n.a}-${n.b} 育成主軸不足`);}if(!v68EmployeeCovers(k,d,11,13,'ホール'))out.push(`${k}: 11時台に社員なし`);if(!v62CloseOk(k,d,'ホール'))out.push(`${k}: 閉店条件NG`);return [...new Set(out)];}
+function v114TryMove(k,d,n){let base=JSON.parse(JSON.stringify(schedule[k]||{})),beforeDef=v114BlockDefect(k,d,n),beforeIssues=v114DayIssues(k,d).length,best=null;for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&!v110IsStudent(s)&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定')){let old=base[s.id];for(let p of v113PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};let newDef=v114BlockDefect(k,d,n),iss=v114DayIssues(k,d).length;if(newDef>=beforeDef)continue;let sc=newDef*1000+iss*50+Math.abs(p[0]-old.start)+Math.abs(p[1]-old.end);if(iss<=beforeIssues+1&&(!best||sc<best.sc))best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}schedule[k]=best?best.day:base;return !!best;}
+function v114EnsureWeekendEarlyPair(k,d){if(!v62Weekend(d))return false;let early=v62Pool('ホール').filter(v110IsEarly),current9=early.find(s=>schedule[k]?.[s.id]?.start===9);if(!current9||v68MainMode(current9)!=='フリー')return false;let fixed=early.filter(s=>!schedule[k]?.[s.id]&&v110NormalAvailable(s,d)&&!v73EmpOff(s,k)&&v73MaxConsecOk(s.id,k)&&Number(s.bs)===9&&['時間固定','出勤固定'].includes(v68MainMode(s))).sort((a,b)=>v85RankPower(b)-v85RankPower(a));for(let f of fixed){let fp=v113PatternPool(f,d,{a:9,b:13,min:0})[0];let np=v113PatternPool(current9,d,{a:11,b:17,min:0}).find(p=>p[0]===11)||v113PatternPool(current9,d,{a:11,b:17,min:0})[0];if(!fp||!np)continue;let base=JSON.parse(JSON.stringify(schedule[k]||{}));delete schedule[k][current9.id];schedule[k][f.id]={label:String(fp[0]),start:fp[0],end:fp[1]};schedule[k][current9.id]={label:String(np[0]),start:np[0],end:np[1]};if(v114DayIssues(k,d).length<=v114DayIssues(k,d).length)return true;schedule[k]=base;}return false;}
+function v114EnsureClosing(k,d){let close=v62Close(d),guard=0;while(guard++<15){let def=v113ClosingDeficits(k,d);if(!def.count&&!def.emp&&!def.reg&&!def.drink)return true;let base=JSON.parse(JSON.stringify(schedule[k]||{})),best=null;for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id])){let old=base[s.id];if(old.end>=close||(!v85HasClosingAbility(s)&&!s.close))continue;
+   // 11時社員がこの人だけなら、締めのために後ろへ動かさない。
+   if(s.employment==='社員'&&old.start<=11&&old.end>=13){let other=v62Pool('ホール').some(x=>x.id!==s.id&&x.employment==='社員'&&schedule[k]?.[x.id]?.start<=11&&schedule[k]?.[x.id]?.end>=13);if(!other)continue;}
+   for(let p of v113PatternPool(s,d,{a:Math.max(13,close-5),b:close,min:0}).filter(p=>p[1]===close)){schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};let nd=v113ClosingDeficits(k,d),gain=(def.count-nd.count)*5+(def.emp&&!nd.emp?4:0)+(def.reg&&!nd.reg?4:0)+(def.drink&&!nd.drink?4:0);if(gain>0&&(!best||gain>best.gain))best={day:JSON.parse(JSON.stringify(schedule[k])),gain};}}
+ schedule[k]=best?best.day:base;if(best)continue;
+ let cands=v62Pool('ホール').filter(s=>!schedule[k]?.[s.id]&&!v73EmpOff(s,k)&&v110NormalAvailable(s,d)&&v73MaxConsecOk(s.id,k)&&(v85HasClosingAbility(s)||s.close));let added=false;for(let s of cands){for(let p of v113PatternPool(s,d,{a:Math.max(13,close-5),b:close,min:0}).filter(p=>p[1]===close)){schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};added=true;break;}if(added)break;}if(!added)break;}
+ return v62CloseOk(k,d,'ホール');}
+function v114RepairDay(k,d){v113NormalizeFixed(k,d);v114EnsureWeekendEarlyPair(k,d);v113FixEarlyEmployee(k,d);let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');for(let n of v62Blocks(d)){let g=0;while(g++<40&&!v114BlockOkay(k,d,n)){if(v114TryMove(k,d,n))continue;if(v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v114EnsureClosing(k,d);v113NormalizeFixed(k,d);v113FixEarlyEmployee(k,d);for(let n of v62Blocks(d)){let g=0;while(g++<20&&!v114BlockOkay(k,d,n)){if(v114TryMove(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v114EnsureClosing(k,d);v113FixEarlyEmployee(k,d);}
+function v114CanRemove(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;delete schedule[k][s.id];let ok=v114DayIssues(k,d).length===0;schedule[k][s.id]=old;return ok;}
+function v114TrimDay(k,d,cut){let g=0;while(g++<80){let c=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員'&&v114CanRemove(s,k,d));if(!c.length)break;c.sort((a,b)=>v110RemovalScore(b,k,d,cut)-v110RemovalScore(a,k,d,cut));let s=c[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v114Validate(){let out=[];for(let d of dates)out.push(...v114DayIssues(ymd(d),d));for(let s of v62Pool('ホール')){let run=0;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]){run++;if(run>Number(s.max||5))out.push(`${s.name}: 最大連勤超過`);}else run=0;}}for(let s of v62Pool('ホール').filter(s=>s.employment==='社員')){let off=dates.length-monthScheduledDaysFor(s.id);if(off!==8)out.push(`${s.name}: 社員休み${off}日`);}let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(life.length&&stud.length){let minF=Math.min(...life.map(v75AssignedHours)),maxS=Math.max(...stud.map(v75AssignedHours));if(maxS>=minF)out.push(`学生勤務時間${maxS}hがフリー主軸最少${minF}h以上`);}return [...new Set(out)];}
+function v114AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v106AutoHallFinal();v110SeedAll();for(let pass=0;pass<4;pass++)for(let d of dates)v114RepairDay(ymd(d),d);let cut={};for(let d of dates)v114TrimDay(ymd(d),d,cut);for(let pass=0;pass<2;pass++)for(let d of dates)v114RepairDay(ymd(d),d);v110MonthlyRebalance();v112SwapScarceStudents();v113BalanceFreeStudent();for(let pass=0;pass<3;pass++)for(let d of dates)v114RepairDay(ymd(d),d);cut={};for(let d of dates)v114TrimDay(ymd(d),d,cut);for(let d of dates)v114RepairDay(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v114Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v114AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v114AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v114AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v114Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v114 =====
+</script>
+
+
+<script>
+// ===== v115 土日祝+1〜2は「目標」、絶対警告は営業不能だけ =====
+function v115CompositionOkay(k,d,n){if(n.a<11)return true;let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),hybA=active.filter(s=>!v110FullHall(s)&&s.rank==='A').length;let A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length;if(!active.some(v110IsPartTimeB))return false;let cnt=active.length;if(n.a>=20)return cnt>=n.min&&(A>=1||B>=2||C>=1);if(A>=2)return cnt>=n.min;if(A>=1&&B>=1)return cnt>=n.min;if(hybA>=1&&B>=1)return cnt>=n.min;if(B>=2)return cnt>=n.min;if(B>=1&&C>=2)return cnt>=Math.max(n.min,n.min>=4?5:3);if(B>=1&&C>=1)return cnt>=Math.max(n.min,n.min>=4?5:4);return false;}
+function v115HardTarget(k,d,n){return n.min;}
+function v115PreferredTarget(k,d,n){if(!v62Weekend(d)||n.a<11)return n.min;let active=v110BlockPeople(k,n.a,n.b),full=active.filter(v110FullHall),A=full.filter(s=>s.rank==='A').length,B=full.filter(s=>s.rank==='B').length,C=full.filter(s=>s.rank==='C').length;let extra=1;if(n.a<20&&A===0&&B<=1&&C<=1)extra=2;if(n.a<20&&A===1&&B===1&&C===0)extra=2;let feasible=v114FeasibleCount(d,n);return Math.max(n.min,Math.min(n.min+extra,feasible));}
+function v115Employee11(k){return v62Pool('ホール').some(s=>s.employment==='社員'&&schedule[k]?.[s.id]?.start<=11&&schedule[k]?.[s.id]?.end>13);}
+function v115HardBlockOkay(k,d,n){let count=v110BlockPeople(k,n.a,n.b).length;if(count<v115HardTarget(k,d,n))return false;if(n.a>=11&&!v115CompositionOkay(k,d,n))return false;if(n.a>=11&&!v110HasDriba(k,n.a,n.b))return false;return true;}
+function v115DayIssues(k,d){let out=[],pool=v62Pool('ホール'),nine=pool.filter(s=>schedule[k]?.[s.id]?.start===9);if(nine.length!==1)out.push(`${k}: 9時入り${nine.length}人`);if(nine.length===1&&!v62SetupSkill(nine[0]))out.push(`${k}: セッティングスキルなし`);for(let s of pool){let p=schedule[k]?.[s.id];if(!p)continue;let r=reqObj(s.id,k);if(p.start===10)out.push(`${k}: ${s.name} ホール10時入り`);if(!v113AllowedShift(s,d,p.start,p.end))out.push(`${k}: ${s.name} 勤務時間条件違反`);if(r.m==='×')out.push(`${k}: ${s.name}休み希望違反`);}for(let n of v62Blocks(d)){let count=v110BlockPeople(k,n.a,n.b).length;if(count<n.min)out.push(`${k}: ${n.a}-${n.b} 人数不足 ${count}/${n.min}`);if(n.a>=11&&!v110HasPartTimeB(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} バイトB以上不在`);if(n.a>=11&&!v115CompositionOkay(k,d,n))out.push(`${k}: ${n.a}-${n.b} 戦力構成NG`);if(n.a>=11&&!v110HasDriba(k,n.a,n.b))out.push(`${k}: ${n.a}-${n.b} ドリバ不在`);if(!v85TraineeMentored(k,n.a,n.b,'ホール'))out.push(`${k}: ${n.a}-${n.b} 育成主軸不足`);}if(!v115Employee11(k))out.push(`${k}: 11時社員なし`);if(!v62CloseOk(k,d,'ホール'))out.push(`${k}: 閉店条件NG`);return [...new Set(out)];}
+function v115FixEmployee11(k,d){if(v115Employee11(k))return true;let emps=v62Pool('ホール').filter(s=>s.employment==='社員'&&schedule[k]?.[s.id]&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定').sort((a,b)=>(a.closePriority?1:0)-(b.closePriority?1:0)||v75AssignedHours(a)-v75AssignedHours(b));for(let s of emps){for(let p of [[11,20],[11,19]])if(v113AllowedShift(s,d,p[0],p[1])){schedule[k][s.id]={label:'11',start:11,end:p[1]};return true;}}return false;}
+function v115TryMoveForHard(k,d,n){let base=JSON.parse(JSON.stringify(schedule[k]||{})),before=v115DayIssues(k,d).length,bdef=(v115HardBlockOkay(k,d,n)?0:1),best=null;for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&!v110IsStudent(s)&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定')){let old=base[s.id];for(let p of v113PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};if(!v115HardBlockOkay(k,d,n))continue;let iss=v115DayIssues(k,d).length,sc=iss*100+Math.abs(p[0]-old.start)+Math.abs(p[1]-old.end);if(iss<=before+1&&(!best||sc<best.sc))best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}schedule[k]=best?best.day:base;return !!best;}
+function v115RepairHard(k,d){v113NormalizeFixed(k,d);v115FixEmployee11(k,d);let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');for(let n of v62Blocks(d)){let g=0;while(g++<30&&!v115HardBlockOkay(k,d,n)){if(v115TryMoveForHard(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v114EnsureClosing(k,d);v113NormalizeFixed(k,d);v115FixEmployee11(k,d);for(let n of v62Blocks(d)){let g=0;while(g++<15&&!v115HardBlockOkay(k,d,n)){if(v115TryMoveForHard(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v114EnsureClosing(k,d);v115FixEmployee11(k,d);}
+function v115RepairPreferred(k,d){if(!v62Weekend(d))return;for(let n of v62Blocks(d).filter(n=>n.a>=11)){let target=v115PreferredTarget(k,d,n),g=0;while(v110BlockPeople(k,n.a,n.b).length<target&&g++<12){let before=v115DayIssues(k,d).length,base=JSON.parse(JSON.stringify(schedule[k]||{}));let moved=false;
+   // まず既存のフリーを前倒し/延長して厚くする。
+   for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&!v110IsStudent(s)&&v68MainMode(s)!=='時間固定'&&v68MainMode(s)!=='出勤固定')){let old=base[s.id];for(let p of v113PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};let cnt=v110BlockPeople(k,n.a,n.b).length;if(cnt>v110BlockPeople.call?0:0);if(cnt>0&&v115DayIssues(k,d).length<=before&&cnt>base.__dummy){/* noop */}let oldCnt=Object.values(base).filter(sh=>sh.start<n.b&&sh.end>n.a).length;if(cnt>oldCnt&&v115DayIssues(k,d).length<=before){moved=true;break;}}if(moved)break;}
+   if(moved)continue;schedule[k]=base;if(v113AddBest(k,d,n,false))continue;break;}}
+}
+function v115CanRemove(s,k,d){let old=schedule[k]?.[s.id];if(!old||s.employment==='社員')return false;let touched=v62Blocks(d).filter(n=>old.start<n.b&&old.end>n.a);delete schedule[k][s.id];let hard=v115DayIssues(k,d).length===0,soft=true;if(hard&&v62Weekend(d)){for(let n of touched){let after=v110BlockPeople(k,n.a,n.b).length;if(after<v115PreferredTarget(k,d,n)){soft=false;break;}}}schedule[k][s.id]=old;return hard&&soft;}
+function v115TrimDay(k,d,cut){let g=0;while(g++<80){let c=v62Pool('ホール').filter(s=>schedule[k]?.[s.id]&&s.employment!=='社員'&&v115CanRemove(s,k,d));if(!c.length)break;c.sort((a,b)=>v110RemovalScore(b,k,d,cut)-v110RemovalScore(a,k,d,cut));let s=c[0];delete schedule[k][s.id];cut[s.id]=(cut[s.id]||0)+1;}}
+function v115BalanceFreeStudent(){let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(!life.length||!stud.length)return;for(let loop=0;loop<80;loop++){let lf=life.slice().sort((a,b)=>v75AssignedHours(a)-v75AssignedHours(b))[0],ss=stud.slice().sort((a,b)=>v75AssignedHours(b)-v75AssignedHours(a)||v110RequestedDays(b)-v110RequestedDays(a))[0];if(v75AssignedHours(ss)<v75AssignedHours(lf))break;let changed=false;for(let d of dates){let k=ymd(d),old=schedule[k]?.[lf.id];if(!old)continue;for(let p of v113PatternPool(lf,d,{a:13,b:v62Close(d),min:0}).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))){if(p[1]-p[0]<=old.end-old.start)continue;let base={...old};schedule[k][lf.id]={label:String(p[0]),start:p[0],end:p[1]};if(v115DayIssues(k,d).length===0){changed=true;break;}schedule[k][lf.id]=base;}if(changed)break;}if(changed)continue;for(let s of stud.slice().sort((a,b)=>v110RequestedDays(b)-v110RequestedDays(a)||v75AssignedHours(b)-v75AssignedHours(a))){for(let d of dates){let k=ymd(d),old=schedule[k]?.[s.id];if(!old)continue;delete schedule[k][s.id];if(v115DayIssues(k,d).length===0){changed=true;break;}schedule[k][s.id]=old;}if(changed)break;}if(!changed)break;}}
+function v115Validate(){let out=[];for(let d of dates)out.push(...v115DayIssues(ymd(d),d));for(let s of v62Pool('ホール')){let run=0;for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id]){run++;if(run>Number(s.max||5))out.push(`${s.name}: 最大連勤超過`);}else run=0;}}for(let s of v62Pool('ホール').filter(s=>s.employment==='社員')){let off=dates.length-monthScheduledDaysFor(s.id);if(off!==8)out.push(`${s.name}: 社員休み${off}日`);}let life=v62Pool('ホール').filter(v110IsLifeFree),stud=v62Pool('ホール').filter(v110IsStudent);if(life.length&&stud.length){let minF=Math.min(...life.map(v75AssignedHours)),maxS=Math.max(...stud.map(v75AssignedHours));if(maxS>=minF)out.push(`学生勤務時間${maxS}hがフリー主軸最少${minF}h以上`);}return [...new Set(out)];}
+function v115AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v106AutoHallFinal();v110SeedAll();for(let pass=0;pass<3;pass++)for(let d of dates)v115RepairHard(ymd(d),d);for(let d of dates)v115RepairPreferred(ymd(d),d);let cut={};for(let d of dates)v115TrimDay(ymd(d),d,cut);for(let d of dates)v115RepairHard(ymd(d),d);v110MonthlyRebalance();v112SwapScarceStudents();v115BalanceFreeStudent();for(let pass=0;pass<2;pass++)for(let d of dates)v115RepairHard(ymd(d),d);for(let d of dates)v115RepairPreferred(ymd(d),d);cut={};for(let d of dates)v115TrimDay(ymd(d),d,cut);for(let d of dates)v115RepairHard(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v115Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v115AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v115AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v115AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v115Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v115 =====
+</script>
+
+
+<script>
+// ===== v116 学生の時間制約活用＋連勤の自動入替 =====
+function v116TryMoveStudentForBlock(k,d,n){let base=JSON.parse(JSON.stringify(schedule[k]||{})),before=v115DayIssues(k,d).length,best=null;for(let s of v62Pool('ホール').filter(s=>v110IsStudent(s)&&schedule[k]?.[s.id]&&v76StudentRequested(s,k))){let old=base[s.id];for(let p of v113PatternPool(s,d,n)){if(p[0]>=n.b||p[1]<=n.a)continue;schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};let blockOk=v115HardBlockOkay(k,d,n);if(!blockOk)continue;v114EnsureClosing(k,d);v115FixEmployee11(k,d);let iss=v115DayIssues(k,d).length,sc=iss*100+Math.abs(p[0]-old.start)+Math.abs(p[1]-old.end);if(iss<=before+1&&(!best||sc<best.sc))best={day:JSON.parse(JSON.stringify(schedule[k])),sc};}}
+schedule[k]=best?best.day:base;return !!best;}
+function v116RepairHard(k,d){v113NormalizeFixed(k,d);v115FixEmployee11(k,d);let pool=v62Pool('ホール').filter(s=>v68CanWorkBase(s,d)&&!v73EmpOff(s,k));v73EnsureSetup(k,d,pool,'ホール');for(let n of v62Blocks(d)){let g=0;while(g++<35&&!v115HardBlockOkay(k,d,n)){if(v115TryMoveForHard(k,d,n)||v116TryMoveStudentForBlock(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v114EnsureClosing(k,d);v113NormalizeFixed(k,d);v115FixEmployee11(k,d);for(let n of v62Blocks(d)){let g=0;while(g++<18&&!v115HardBlockOkay(k,d,n)){if(v115TryMoveForHard(k,d,n)||v116TryMoveStudentForBlock(k,d,n)||v113AddBest(k,d,n,false)||v113AddBest(k,d,n,true))continue;break;}}v114EnsureClosing(k,d);v115FixEmployee11(k,d);}
+function v116FixConsecutive(){for(let s of v62Pool('ホール')){let max=Number(s.max||5),guard=0;while(guard++<30){let runs=[],run=[];for(let d of dates){let k=ymd(d);if(schedule[k]?.[s.id])run.push(d);else{if(run.length>max)runs.push(run.slice());run=[];}}if(run.length>max)runs.push(run.slice());if(!runs.length)break;let fixed=false;for(let rr of runs){let choices=rr.slice().sort((a,b)=>{let ka=ymd(a),kb=ymd(b);return v110RemovalScore(s,kb,b,{})-v110RemovalScore(s,ka,a,{});});for(let d of choices){let k=ymd(d),base=JSON.parse(JSON.stringify(schedule[k]||{})),r=requests[s.id]?.[k]||{m:'',h:'17',d:'from'},saved=JSON.parse(JSON.stringify(r));requests[s.id]??={};requests[s.id][k]={...r,m:'×'};delete schedule[k][s.id];v116RepairHard(k,d);requests[s.id][k]=saved;if(!schedule[k]?.[s.id]&&v115DayIssues(k,d).length===0){fixed=true;break;}schedule[k]=base;requests[s.id][k]=saved;}if(fixed)break;}if(!fixed)break;}}
+}
+function v116Validate(){return v115Validate();}
+function v116AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v106AutoHallFinal();v110SeedAll();for(let pass=0;pass<3;pass++)for(let d of dates)v116RepairHard(ymd(d),d);for(let d of dates)v115RepairPreferred(ymd(d),d);let cut={};for(let d of dates)v115TrimDay(ymd(d),d,cut);for(let d of dates)v116RepairHard(ymd(d),d);v116FixConsecutive();for(let d of dates)v116RepairHard(ymd(d),d);v110MonthlyRebalance();v112SwapScarceStudents();v115BalanceFreeStudent();v116FixConsecutive();for(let pass=0;pass<2;pass++)for(let d of dates)v116RepairHard(ymd(d),d);for(let d of dates)v115RepairPreferred(ymd(d),d);cut={};for(let d of dates)v115TrimDay(ymd(d),d,cut);v116FixConsecutive();for(let d of dates)v116RepairHard(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v116Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v116AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v116AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v116AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v116Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v116 =====
+</script>
+
+
+<script>
+// ===== v117 学生の土日早出を「開始制約」として正しく使う =====
+function v113PatternPool(s,d,n){let close=v62Close(d),mode=v68MainMode(s),cat=staffCategory(s),out=[];
+ if(v110IsStudent(s)){
+   let starts=[],r=reqObj(s.id,ymd(d));
+   if(r.m==='時間'){
+     if(r.ts!==undefined&&r.ts!=='')starts.push(Number(r.ts));
+     else if(r.d==='from'&&r.h!=='')starts.push(Number(r.h));
+   }
+   if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)starts.push(Number(s.os));
+   starts.push(Number(s.bs));
+   starts=[...new Set(starts.filter(Number.isFinite))];
+   for(let st of starts){
+     let ends=[Number(s.be),Math.min(close,st+5),Math.min(close,st+8),Math.min(close,st+9),20,22,close];
+     for(let en of ends)if(en>st&&en-st<=9&&en<=close)out.push([st,en]);
+   }
+ } else if(mode==='時間固定')out=[[Number(s.bs),Math.min(Number(s.be),close)]];
+ else if(mode==='出勤固定'){let st=Number(s.bs);for(let en of [Number(s.be),20,22,close])if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}
+ else if(s.employment==='社員'){for(let p of [[11,20],[12,21],[13,22],[14,close],[13,close]])if(p[1]>p[0]&&p[1]-p[0]>=7&&p[1]-p[0]<=9&&p[1]<=close)out.push(p);}
+ else if(cat==='バイト 早番'){let bs=Number(s.bs),be=Math.min(Number(s.be),close);for(let st of [bs,11,12,13])if(st>=bs&&st<be)out.push([st,be]);}
+ else if(v110IsLifeFree(s)){let starts=[13,14,15,16,17,18,Number(s.bs)];if(v62Weekend(d)&&s.os!==''&&s.os!==undefined)starts.push(Number(s.os));for(let st of starts){for(let en of [20,22,close,Number(s.be)])if(en>st&&en-st<=9&&en<=close)out.push([st,en]);}}
+ let seen=new Set();return out.filter(p=>{let key=p[0]+'-'+p[1];if(seen.has(key)||!v113AllowedShift(s,d,p[0],p[1]))return false;seen.add(key);return true;});}
+function v117Validate(){return v115Validate();}
+function v117AutoHall(){return v116AutoHall();}
+function v117AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v117AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v117AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v117Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v117 =====
+</script>
+
+
+<script>
+// ===== v118 最終ローカル最適化：警告が残った日は人の移動・追加を総当たりで再検討 =====
+function v118OptimizeDay(k,d){let guard=0;while(guard++<20){let base=JSON.parse(JSON.stringify(schedule[k]||{})),before=v115DayIssues(k,d),best=null;if(!before.length)return true;
+  // 既に入っている人の時間を動かす。学生も含め、制約内の候補を全部比較する。
+  for(let s of v62Pool('ホール').filter(s=>schedule[k]?.[s.id])){
+    let old=base[s.id];
+    if(v68MainMode(s)==='時間固定')continue;
+    for(let n of v62Blocks(d))for(let p of v113PatternPool(s,d,n)){
+      if(p[0]===old.start&&p[1]===old.end)continue;
+      schedule[k]=JSON.parse(JSON.stringify(base));
+      schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};
+      v114EnsureClosing(k,d);v115FixEmployee11(k,d);v113NormalizeFixed(k,d);
+      let iss=v115DayIssues(k,d),score=iss.length*100+Math.abs(p[0]-old.start)+Math.abs(p[1]-old.end);
+      if(iss.length<before.length&&(!best||score<best.score))best={day:JSON.parse(JSON.stringify(schedule[k])),score};
+    }
+  }
+  // 未配置者を追加する案も比較。△は最後の手段。
+  for(let delta of [false,true]){
+    let cand=v62Pool('ホール').filter(s=>!base[s.id]&&!v73EmpOff(s,k)&&(delta?v110EmergencyAvailable(s,d):v110NormalAvailable(s,d))&&v73MaxConsecOk(s.id,k));
+    for(let s of cand){
+      for(let n of v62Blocks(d))for(let p of v113PatternPool(s,d,n)){
+        schedule[k]=JSON.parse(JSON.stringify(base));schedule[k][s.id]={label:String(p[0]),start:p[0],end:p[1]};
+        v114EnsureClosing(k,d);v115FixEmployee11(k,d);v113NormalizeFixed(k,d);
+        let iss=v115DayIssues(k,d),score=iss.length*100+(delta?5000:0)+(p[1]-p[0]);
+        if(iss.length<before.length&&(!best||score<best.score))best={day:JSON.parse(JSON.stringify(schedule[k])),score};
+      }
+    }
+  }
+  schedule[k]=best?best.day:base;if(!best)break;
+ }
+ return v115DayIssues(k,d).length===0;}
+function v118Validate(){return v115Validate();}
+function v118AutoHall(){const realAlert=window.alert;window.alert=()=>{};try{v116AutoHall();for(let pass=0;pass<4;pass++){let changed=false;for(let d of dates){let k=ymd(d),before=v115DayIssues(k,d).length;if(before){v118OptimizeDay(k,d);if(v115DayIssues(k,d).length<before)changed=true;}}if(!changed)break;}v116FixConsecutive();for(let d of dates){v116RepairHard(ymd(d),d);v118OptimizeDay(ymd(d),d);}v115BalanceFreeStudent();for(let d of dates)v118OptimizeDay(ymd(d),d);}finally{window.alert=realAlert;}quickSave();renderAll();let q=v118Validate();realAlert(q.length?`ホールの自動生成をしました\n確認が必要な項目：${q.length}件`:'ホールの自動生成をしました');}
+function v118AutoMake(role){role=role||view.month||'ホール';if(role==='ホール')return v118AutoHall();return v106AutoMakeFinal(role);}
+function v62AutoMake(role){return v118AutoMake(role||view.month||'ホール');}
+function renderWarnings(){const w=[];if(v106HasRoleSchedule('ホール'))w.push(...v118Validate());if(v106HasRoleSchedule('調理場'))w.push(...v102KitchenValidate());const uniq=[...new Set(w)];warnings.innerHTML=uniq.length?uniq.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';}
+// ===== /v118 =====
+</script>
+
 </body>
 </html>
