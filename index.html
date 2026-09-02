@@ -8542,6 +8542,102 @@ window.v213Validate=window.v212Validate;
 window.autoMake=function(){return window.v213AutoHall();};window.v62AutoMake=window.autoMake;
 // ===== /v213 =====
 </script>
+
+
+<script>
+// ===== v228 strict employee weekends / fair weekend free / preview availability marks =====
+(()=>{
+  const BASE=window.v227AutoHall||window.autoMake;
+  const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール');
+  const EMP=s=>s.employment==='社員';
+  const CAT=s=>staffCategory(s), FREE=s=>['バイト 遅番','バイト フリー'].includes(CAT(s));
+  const R=(s,d)=>requests?.[s.id]?.[K(d)]||{}, SH=(s,d)=>schedule?.[K(d)]?.[s.id]||null;
+  const HARD=(s,d)=>['×','有給'].includes(R(s,d).m), SOFT=(s,d)=>R(s,d).m==='△';
+  function empPattern(e,d){
+    const c=closeHour(d); let st=(e.name==='佐野'||Number(e.bs||13)<=11)?11:Math.min(13,Number(e.bs||13));
+    if(st>13)st=13; let en=Math.min(c,st+9); if(e.name==='佐野')en=Math.min(c,20);
+    return {label:String(st),start:st,end:en};
+  }
+  function maxRun(e){let cur=0,mx=0;for(const d of dates){if(SH(e,d)){cur++;mx=Math.max(mx,cur)}else cur=0}return mx;}
+  function activeCount(d,h,skipId=null){return H().filter(s=>s.id!==skipId&&SH(s,d)&&SH(s,d).start<=h&&SH(s,d).end>h).length;}
+  function weekdayDonorScore(e,d){
+    let q=0; for(let h=11;h<Math.min(20,closeHour(d));h++)q+=activeCount(d,h,e.id);
+    // 既存の休みに隣接すると自然な連休になるため少し優先。
+    const i=dates.findIndex(x=>K(x)===K(d));
+    if(i>0&&!SH(e,dates[i-1]))q+=6;if(i+1<dates.length&&!SH(e,dates[i+1]))q+=6;
+    return q;
+  }
+  function strictEmployeeWeekendOffs(){
+    const es=H().filter(EMP);
+    for(const d of dates){
+      if(!isWeekend(d))continue;
+      for(const e of es){
+        // 土日祝に休めるのは本人希望（×/△/有給）の時だけ。
+        if(SH(e,d)||HARD(e,d)||SOFT(e,d))continue;
+        const donors=dates.filter(od=>!isWeekend(od)&&SH(e,od)&&!HARD(e,od)&&!SOFT(e,od)&&!eventAttend?.[K(od)]?.[e.id]
+          // 公休を置く平日は、他社員が全員勤務している日を優先・必須とする。
+          &&es.filter(x=>x.id!==e.id).every(x=>!!SH(x,od)));
+        let best=null;
+        for(const od of donors){
+          const kd=K(d),ko=K(od),oldD=schedule?.[kd]?.[e.id],oldO=schedule?.[ko]?.[e.id];
+          schedule[kd]??={}; schedule[kd][e.id]=empPattern(e,d); delete schedule[ko][e.id];
+          const mr=maxRun(e), min=Math.min(...Array.from({length:Math.max(1,Math.min(20,closeHour(od))-11)},(_,j)=>activeCount(od,11+j)));
+          const score=weekdayDonorScore(e,od)+(min>=3?30:0)-(mr>Number(e.max||6)?1000:0);
+          if(oldD)schedule[kd][e.id]=oldD;else delete schedule[kd][e.id]; schedule[ko][e.id]=oldO;
+          if(mr<=Number(e.max||6)&&(!best||score>best.score))best={od,score};
+        }
+        if(best){schedule[K(d)]??={};schedule[K(d)][e.id]=empPattern(e,d);delete schedule[K(best.od)][e.id];}
+      }
+    }
+  }
+  function requestedTime(s,d){const r=R(s,d);return r.m==='時間'||r.ts!==undefined&&r.ts!==''||r.te!==undefined&&r.te!=='';}
+  function earlyWeekendCount(s,beforeIdx){let n=0;for(let i=0;i<beforeIdx;i++){let d=dates[i],p=SH(s,d);if(isWeekend(d)&&p&&p.start<=14)n++;}return n;}
+  function fairWeekendFree(){
+    const a=H().find(s=>s.name==='大沢'),b=H().find(s=>s.name==='峠');if(!a||!b)return;
+    for(let i=0;i<dates.length;i++){
+      const d=dates[i];if(!isWeekend(d))continue;let pa=SH(a,d),pb=SH(b,d);if(!pa||!pb||requestedTime(a,d)||requestedTime(b,d))continue;
+      const ae=pa.start<=14,be=pb.start<=14;if(ae===be)continue;
+      const early=ae?a:b,late=ae?b:a,ce=earlyWeekendCount(early,i),cl=earlyWeekendCount(late,i);
+      // 同等条件なら、前出し回数が少ない方へ早いシフトを渡す。
+      if(ce<=cl)continue;
+      const pe={...(ae?pa:pb)},pl={...(ae?pb:pa)};
+      if(pe.end-pe.start>9||pl.end-pl.start>9)continue;
+      schedule[K(d)][early.id]={...pl};schedule[K(d)][late.id]={...pe};
+    }
+  }
+  function weekendEmployeeIssues(){let out=[];for(const d of dates){if(!isWeekend(d))continue;for(const e of H().filter(EMP)){if(!SH(e,d)&&!HARD(e,d)&&!SOFT(e,d))out.push(`${K(d)}:${e.name} 希望なし土日祝自動公休`);}}return out;}
+  window.v228AutoHall=function(){
+    let real=window.alert;window.alert=()=>{};
+    try{BASE();strictEmployeeWeekendOffs();fairWeekendFree();strictEmployeeWeekendOffs();fairWeekendFree();}
+    finally{window.alert=real;}
+    window.v228Issues=[...(window.v227Validate?window.v227Validate():[]),...weekendEmployeeIssues()];window.v228Issues=[...new Set(window.v228Issues)];
+    quickSave();renderAll();real(window.v228Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v228Issues.length}件`:'ホールの自動生成をしました');
+  };
+  window.v228Validate=()=>[...new Set([...(window.v227Validate?window.v227Validate():[]),...weekendEmployeeIssues()])];
+  window.autoMake=window.v228AutoHall;window.v62AutoMake=window.autoMake;
+
+  // × = 本人が出勤可能日として提出していない / 土日出勤不可 / 希望休。
+  // ／ = 出勤可能だったが、生成側の人数調整で休み。
+  // △時刻 = できれば休み希望だったが出勤。
+  window.renderPreview=function(){
+    const title=month.selectedOptions[0].textContent,list=H();
+    const evrow='<tr><th></th>'+dates.map(d=>`<th><div class="previewEvent">${eventDisplay(K(d))}</div></th>`).join('')+'</tr>';
+    const head='<tr><th></th>'+dates.map(d=>`<th>${d.getDate()}<br>${wd(d)}</th>`).join('')+'</tr>';
+    let rows='',prev=null;
+    for(const s of list){const g=staffCategory(s);if(prev!==null&&g!==prev)rows+=`<tr class="groupGap"><td colspan="${dates.length+1}"></td></tr>`;
+      rows+='<tr><td>'+s.name+'</td>'+dates.map(d=>{let p=SH(s,d),r=R(s,d),text;
+        if(p) text=(r.m==='△'?'△':'')+p.label;
+        else if(r.m==='有給') text='有給';
+        else if(r.m==='×'||r.m==='△') text='×';
+        else if(s.weekend===false&&isWeekend(d)) text='×';
+        else if(s.input==='work'&&!['○','時間'].includes(r.m)) text='×';
+        else text='／';
+        return '<td>'+text+'</td>';}).join('')+'</tr>';prev=g;}
+    sheet.innerHTML=`<div class="miniTitle">${title} ホールシフト</div><table class="pt">${evrow}${head}${rows}</table>`;
+  };
+})();
+// ===== /v228 =====
+</script>
 </body>
 </html>
 
