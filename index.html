@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v168</title>
+<title>1人管理用シフト生成アプリ v169</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -245,7 +245,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v168</h1><div class="sub">希望入力拡張・育成優先・戦力構成版</div></header>
+<header><h1>1人管理用シフト生成アプリ v169</h1><div class="sub">希望入力拡張・育成優先・戦力構成版</div></header>
 
 <main>
 <section class="card">
@@ -7716,7 +7716,7 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
 
 
 <script>
-// ===== v168 independent hall generation engine: early -> employee -> late -> monthly balance =====
+// ===== v169 independent hall generation engine: early -> employee -> late -> monthly balance =====
 (()=>{
   const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール');
   const CAT=s=>staffCategory(s), EMP=s=>s.employment==='社員', EAR=s=>CAT(s)==='バイト 早番', STU=s=>CAT(s)==='バイト 学生', LATE=s=>['バイト 遅番','バイト フリー'].includes(CAT(s));
@@ -7756,22 +7756,30 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
     for(const st of [11,12,13])if(st>=bs&&st<be)out.push([st,be]);
     return out.filter(p=>p[1]>p[0]&&p[1]-p[0]<=9);
   }
-  function employeePattern(s,d){let c=C(d),r=RQ(s,d),exS=explicitStart(s,d),exE=explicitEnd(s,d);if(exS!==null){let en=exE!==null?exE:Math.min(c,exS+9);return [exS,en];}
+  function otherApplies(s,d){let m=s.otherMode||'フリー';return m==='フリー'||(m==='土日祝'&&WK(d))||(m==='平日'&&!WK(d));}
+  function employeePattern(s,d){let c=C(d),exS=explicitStart(s,d),exE=explicitEnd(s,d);if(exS!==null){let en=exE!==null?exE:Math.min(c,exS+9);return [exS,en];}
     let bs=Number(s.bs),st=bs,en=bs+9;
     if(s.mainMode==='出勤固定'||s.mainMode==='時間固定'){st=bs;en=Math.min(c,Number(s.be),st+9);}
     else if(s.closePriority){en=c;st=Math.max(bs,c-9);}
     else {en=Math.min(c,st+9);if(en-st<9&&c>=9){en=c;st=Math.max(bs,en-9);}}
     return [st,en];
   }
+  function employeePatterns(s,d){let c=C(d),main=employeePattern(s,d),out=[main],exS=explicitStart(s,d),exE=explicitEnd(s,d);if(exS!==null)return out;
+    if(otherApplies(s,d)){let os=(s.os!==''&&s.os!==undefined)?Number(s.os):null,oe=(s.oe!==''&&s.oe!==undefined)?Number(s.oe):null;
+      if(os!==null){let en=oe!==null?Math.min(c,oe):Math.min(c,os+9);if(en-os===9)out.push([os,en]);}
+      else if(oe!==null){let st=oe-9;if(st>=9)out.push([st,Math.min(c,oe)]);}
+    }
+    // 同じ9時間候補を重複排除。締め優先は後ろ、非締め優先はメインを先に保つ。
+    return out.filter(p=>p&&p[1]>p[0]&&Math.abs((p[1]-p[0])-9)<0.01).filter((p,i,a)=>a.findIndex(q=>q[0]===p[0]&&q[1]===p[1])===i);
+  }
   function lateStudentPatterns(s,d){let c=C(d),r=RQ(s,d),bs=Number(s.bs),exS=explicitStart(s,d),exE=explicitEnd(s,d),out=[];
     if(exS!==null){let en=exE!==null?exE:Math.min(c,Math.max(Number(s.be)||c,exS+4),exS+9);if((DC(s)||RC(s)||s.closePriority)&&c-exS<=9)en=c;return [[exS,en]];}
     if(STU(s)){
       let st=bs;if(WK(d)&&s.otherMode==='土日祝'&&s.os!==''&&s.os!==undefined)st=Number(s.os);let en=Math.min(c,Math.max(Number(s.be)||c,st+4),st+9);if((DC(s)||RC(s))&&c-st<=9)en=c;return [[st,en]];
     }
-    // フリー/遅番は基本時間を最優先。土日祝のその他開始も候補。
-    let starts=[bs];if(WK(d)&&s.otherMode==='土日祝'&&s.os!==''&&s.os!==undefined)starts.unshift(Number(s.os));
-    // 中番化は必要な時だけ後で追加するので通常候補は基本/その他時間のみ。
-    for(const st of [...new Set(starts)]){if(st>18)continue;let en=Math.min(c,st+9);if((DC(s)||RC(s)||s.closePriority)&&c-st<=9)en=c;out.push([st,en]);}
+    // フリー遅番の「その他 11時〜」は11時固定ではなく、11時以降から基本開始までの調整範囲。
+    let starts=[bs];if(otherApplies(s,d)&&s.os!==''&&s.os!==undefined){let lo=Number(s.os);for(const st of [lo,12,13,14,15,16,bs])if(st>=lo&&st<=bs)starts.push(st);}
+    for(const st of [...new Set(starts)].sort((a,b)=>a-b)){if(st>18)continue;let en=Math.min(c,st+9);if((DC(s)||RC(s)||s.closePriority)&&c-st<=9)en=c;out.push([st,en]);}
     return out;
   }
   function fallbackLatePatterns(s,d,h){let c=C(d),out=[];if(!LATE(s)||s.mainMode!=='フリー')return out;let base=Number(s.bs);
@@ -7785,15 +7793,15 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
   function afterTop(a){if(!a.length)return 0;let q=a.slice().sort((x,y)=>effRank(y)-effRank(x));q.shift();return strength(q);}
   function hasCoreB(a){return a.some(BPLUS);}
   function requiredCount(d,h,a){if(h<11)return 1;let t=h>=C(d)-1?3:4;
-    // 平日: A/Bが少なくD中心なら人数で補う。
     let high=a.filter(s=>effRank(s)>=3).length, cs=a.filter(s=>effRank(s)===2).length, low=a.filter(s=>effRank(s)<=1).length;
-    if(h<20&&high<=1&&low>=2&&cs===0)t=5;
-    // 土日祝は平日より+1〜2。強い人が休憩で1人抜けた後が危うければ+2。
-    if(WK(d)){t+=1;if(afterTop(a)<7||high<=1)t+=1;t=Math.min(6,t);}
+    // 平日は弱い構成なら+1。人数がまだ基準未満の途中段階では過剰に要求しない。
+    if(!WK(d)&&h<20&&a.length>=t&&high<=1&&low>=2&&cs===0)t=5;
+    // 土日祝はまず平日+1。+2は一度+1まで揃った後、休憩で主力が抜けると危うい時だけ。
+    if(WK(d)){t+=1;if(a.length>=t&&(afterTop(a)<7||high<=1))t=Math.min(6,t+1);}
     return t;
   }
   function hardCoverage(d,h,a=active(d,h)){if(h<11)return true;if(a.length<3)return false;if(!a.some(DR))return false;let feasible=H().some(s=>BPLUS(s)&&allowed(s,d,true));if(feasible&&!hasCoreB(a))return false;return true;}
-  function dayQuality(d){let c=C(d),pen=0;for(let h=11;h<c;h++){let a=active(d,h),t=requiredCount(d,h,a);if(!hardCoverage(d,h,a))pen+=500;if(a.length<t)pen+=(t-a.length)*45; // 薄さ
+  function dayQuality(d){let c=C(d),pen=0;let n9=physical(d,9).length;if(n9!==1)pen+=1800*Math.max(1,Math.abs(n9-1));if(!physical(d,11).some(EMP))pen+=900;for(let h=11;h<c;h++){let a=active(d,h),t=requiredCount(d,h,a);if(!hardCoverage(d,h,a))pen+=500;if(a.length<t)pen+=(t-a.length)*45; // 薄さ
       // 強い人の固まりすぎを軽く抑制。AAABBBのような過剰は評価を下げる。
       let high=a.filter(s=>effRank(s)>=3).length;if(a.length>=5&&high>=4)pen+=(high-3)*18;
     }
@@ -7813,14 +7821,23 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
     // 9時は必ず1人だけ。
     let nine=[];for(const s of early){if(!allowed(s,d))continue;for(const p of earlyPatterns(s,d))if(p[0]===9)nine.push({s,p,sc:earlyScore(s,p,d)});}
     nine.sort((a,b)=>a.sc-b.sc);if(nine.length)setShift(nine[0].s,d,...nine[0].p);
-    // 11-13の早番骨格。社員を置く前に、早番だけで自然な候補を作る。
-    for(const h of [11,12]){let guard=0;while(active(d,h).filter(EAR).length<2&&guard++<3){let opts=[];for(const s of early){if(shift(s,d)||!allowed(s,d))continue;for(const p of earlyPatterns(s,d)){if(p[0]<=h&&p[1]>h)opts.push({s,p,sc:earlyScore(s,p,d)+startCount(d,p[0])*35});}}opts.sort((a,b)=>a.sc-b.sc);if(!opts.length)break;setShift(opts[0].s,d,...opts[0].p);}}
+    // 13〜17時までつながるバイト主軸を先に確保。9時担当が13時で抜ける場合に遅番Bを早出ししないため。
+    let coreNow=early.some(s=>{let p=shift(s,d);return p&&BPLUS(s)&&p.start<=11&&p.end>=17;});
+    if(!coreNow){let core=[];for(const s of early){if(shift(s,d)||!allowed(s,d)||!BPLUS(s))continue;for(const p of earlyPatterns(s,d)){if(p[0]===9&&startCount(d,9)>=1)continue;if(p[0]<=11&&p[1]>=17)core.push({s,p,sc:earlyScore(s,p,d)-260});}}core.sort((a,b)=>a.sc-b.sc);if(core.length)setShift(core[0].s,d,...core[0].p);}
+    // 平日は早番2人、土日祝は+1して3人を基本。遅番を11時へ寄せる前に早番で厚みを作る。
+    const want=WK(d)?3:2;for(const h of [11,12]){let guard=0;while(active(d,h).filter(EAR).length<want&&guard++<4){let opts=[];for(const s of early){if(shift(s,d)||!allowed(s,d))continue;for(const p of earlyPatterns(s,d)){if(p[0]===9&&startCount(d,9)>=1)continue;if(p[0]<=h&&p[1]>h)opts.push({s,p,sc:earlyScore(s,p,d)+startCount(d,p[0])*90});}}opts.sort((a,b)=>a.sc-b.sc);if(!opts.length)break;setShift(opts[0].s,d,...opts[0].p);}}
   }
 
   // ---------- step 2: employees ----------
   function employeeMustWork(s,d){return !!eventAttend?.[K(d)]?.[s.id];}
   function employeeAvailable(s,d){return !hardOff(s,d)&&!softOff(s,d)&&(s.weekend!==false||!WK(d));}
-  function placeEmployeesInitial(d){for(const e of H().filter(EMP)){if(!employeeAvailable(e,d)&&!employeeMustWork(e,d))continue;if(paid(e,d))continue;let p=employeePattern(e,d);setShift(e,d,p[0],p[1]);}}
+  function placeEmployeesInitial(d){for(const e of H().filter(EMP)){if(!employeeAvailable(e,d)&&!employeeMustWork(e,d))continue;if(paid(e,d))continue;let p=employeePattern(e,d);setShift(e,d,p[0],p[1]);}reflowEmployees(d);}
+  function reflowEmployees(d){let emps=H().filter(e=>EMP(e)&&shift(e,d));if(!emps.length)return false;
+    // 11時に社員が既にいれば基本時間を尊重して何もしない。
+    if(emps.some(e=>{let p=shift(e,d);return p.start<=11&&p.end>11;}))return true;
+    let opts=[];for(const e of emps){if(e.closePriority)continue;for(const p of employeePatterns(e,d)){if(p[0]<=11&&p[1]>11){let cur=shift(e,d),cost=Math.abs(p[0]-Number(e.bs))*80+totalHours(e)*0.05;if(cur&&cur.start===p[0]&&cur.end===p[1])cost-=20;opts.push({e,p,cost});}}}
+    opts.sort((a,b)=>a.cost-b.cost);if(!opts.length)return false;let o=opts[0];return setShift(o.e,d,o.p[0],o.p[1]);
+  }
   function publicOffCount(e){return dates.filter(d=>!shift(e,d)&&!paid(e,d)).length;}
   function employeeRemovableDay(e,d){if(!shift(e,d)||paid(e,d)||hardOff(e,d)||employeeMustWork(e,d))return false;return true;}
 
@@ -7829,8 +7846,12 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
     if(needB&&BPLUS(s))sc-=180;if(needD&&DR(s))sc-=160;
     if(STU(s)){sc-=Math.max(0,14-requestCount(s))*5;sc+=requestCount(s)*2;}
     if(LATE(s)&&st===Number(s.bs))sc-=70;
-    if(WK(d)&&s.otherMode==='土日祝'&&s.os!==''&&Number(s.os)===st)sc-=80;
-    sc+=startCount(d,st)*45;
+    if(WK(d)&&s.otherMode==='土日祝'&&s.os!==''&&Number(s.os)===st)sc-=45;
+    // 締め要員を11〜13時で使い切らない。17時以降は逆にラストまで届く人を優先。
+    if(LATE(s)&&(DC(s)||RC(s))&&p[1]<C(d)&&h<17)sc+=220;
+    if(h>=17&&p[1]===C(d)){sc-=120;if(DC(s))sc-=80;if(RC(s))sc-=80;}
+    sc+=startCount(d,st)*(LATE(s)?150:75);
+    if(LATE(s)&&st<Number(s.bs))sc+=(Number(s.bs)-st)*28;
     sc+=totalHours(s)*1.2+workDays(s)*4;
     if(NEW(s))sc-=25; // 育成枠として使いたい。ただし戦力値はeffRankで弱く評価。
     return sc;
@@ -7841,6 +7862,8 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
   function addFallbackLateAt(d,h){let opts=[];for(const s of H().filter(LATE)){if(shift(s,d)||!allowed(s,d))continue;for(const p of fallbackLatePatterns(s,d,h)){if(p[0]<=h&&p[1]>h)opts.push({s,p,sc:candidateScore(s,p,d,h)+(Number(s.bs)-p[0])*55});}}
     opts.sort((a,b)=>a.sc-b.sc);if(!opts.length)return false;return setShift(opts[0].s,d,...opts[0].p);
   }
+
+  function addEarlyAt(d,h){let opts=[];for(const s of H().filter(EAR)){if(shift(s,d)||!allowed(s,d))continue;for(const p of earlyPatterns(s,d)){if(p[0]===9&&startCount(d,9)>=1)continue;if(p[0]<=h&&p[1]>h){let a=active(d,h),sc=earlyScore(s,p,d);if(!a.some(BPLUS)&&BPLUS(s))sc-=180;if(!a.some(DR)&&DR(s))sc-=120;sc+=startCount(d,p[0])*80;opts.push({s,p,sc});}}}opts.sort((a,b)=>a.sc-b.sc);if(!opts.length)return false;return setShift(opts[0].s,d,...opts[0].p);}
 
   // ---------- day construction ----------
   function buildDay(d){chooseEarlyDay(d);placeEmployeesInitial(d);
@@ -7858,17 +7881,18 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
   // ---------- employee public-off selection ----------
   function snapshotDay(d){let k=K(d);return JSON.parse(JSON.stringify(schedule[k]||{}));}
   function restoreDay(d,snap){schedule[K(d)]=JSON.parse(JSON.stringify(snap||{}));}
-  function fillDayAfterEmployeeOff(d){let c=C(d);for(let h=11;h<c;h++){let guard=0;while(guard++<5){let a=active(d,h),t=requiredCount(d,h,a);if(hardCoverage(d,h,a)&&a.length>=t)break;if(addNaturalAt(d,h))continue;if(h>=13&&h<17&&addFallbackLateAt(d,h))continue;break;}}}
+  function fillDayAfterEmployeeOff(d){reflowEmployees(d);let c=C(d);for(let h=11;h<c;h++){let guard=0;while(guard++<7){let a=active(d,h),t=requiredCount(d,h,a);if(hardCoverage(d,h,a)&&a.length>=t)break;if(h<17&&addEarlyAt(d,h))continue;if(addNaturalAt(d,h))continue;if(h>=13&&h<17&&addFallbackLateAt(d,h))continue;break;}}}
+  function employeeRunAfterOff(e,d){let k=K(d),snap=shift(e,d);if(snap)delShift(e,d);let cur=0,mx=0;for(const x of dates){if(shift(e,x)){cur++;mx=Math.max(mx,cur);}else cur=0;}if(snap){schedule[k]??={};schedule[k][e.id]=snap;}return mx;}
   function choosePublicOffs(){let emps=H().filter(EMP);
     for(const e of emps){let guard=0;while(publicOffCount(e)<8&&guard++<40){let opts=[];
-      for(let i=0;i<dates.length;i++){let d=dates[i];if(!employeeRemovableDay(e,d))continue;let snap=snapshotDay(d),before=dayQuality(d);delShift(e,d);fillDayAfterEmployeeOff(d);let after=dayQuality(d);let q=(after-before)*10+(WK(d)?700:0);
+      for(let i=0;i<dates.length;i++){let d=dates[i];if(!employeeRemovableDay(e,d))continue;let snap=snapshotDay(d),before=dayQuality(d);delShift(e,d);reflowEmployees(d);fillDayAfterEmployeeOff(d);let after=dayQuality(d);let runAfter=employeeRunAfterOff(e,d),q=(after-before)*10+(WK(d)?700:0)+runAfter*45;if(runAfter>Number(e.max||6))q+=(runAfter-Number(e.max||6))*900;
         // 飛び石を強制しない。既存休みと隣接するなら連休も自然なので少し優先。
         if(i>0&&!shift(e,dates[i-1]))q-=70;if(i+1<dates.length&&!shift(e,dates[i+1]))q-=60;
         // 他社員も休みなら避ける。
         let empOff=emps.filter(x=>x.id!==e.id&&!shift(x,d)).length;q+=empOff*180;
         restoreDay(d,snap);opts.push({d,q});}
       opts.sort((a,b)=>a.q-b.q);if(!opts.length)break;let done=false;
-      for(const o of opts){let snap=snapshotDay(o.d);delShift(e,o.d);fillDayAfterEmployeeOff(o.d);if(dayQuality(o.d)<=250){done=true;break;}restoreDay(o.d,snap);}if(!done)break;
+      for(const o of opts){let snap=snapshotDay(o.d);delShift(e,o.d);reflowEmployees(o.d);fillDayAfterEmployeeOff(o.d);if(dayQuality(o.d)<=420&&physical(o.d,11).some(EMP)){repairClose(o.d);done=true;break;}restoreDay(o.d,snap);}if(!done)break;
     }}
   }
 
@@ -7877,14 +7901,24 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
   function trimOverstaff(){for(const d of dates){let c=C(d);let people=H().filter(s=>shift(s,d)&&!EMP(s));people.sort((a,b)=>{
       // 高ランクだから残すのではなく、勤務量の多い人/希望多い学生から削除候補。
       let sa=totalHours(a)+workDays(a)*4+(STU(a)?requestCount(a)*5:0),sb=totalHours(b)+workDays(b)*4+(STU(b)?requestCount(b)*5:0);return sb-sa;});
-      for(const s of people){if(!canRemove(s,d))continue;let p=shift(s,d),over=true;for(let h=Math.max(11,p.start);h<Math.min(c,p.end);h++){let a=active(d,h),t=requiredCount(d,h,a);if(a.length<=t){over=false;break;}}if(over)delShift(s,d);}
+      for(const s of people){let p=shift(s,d);if(p?.start===9)continue;if(!canRemove(s,d))continue;p=shift(s,d);let over=true;for(let h=Math.max(11,p.start);h<Math.min(c,p.end);h++){let a=active(d,h),t=requiredCount(d,h,a);if(a.length<=t){over=false;break;}}if(over)delShift(s,d);}
     }}
-  function repairRuns(){for(const s of H()){let max=Number(s.max||6),guard=0;while(guard++<20){let bestRun=[],cur=[];for(const d of dates){if(shift(s,d)){cur.push(d);if(cur.length>bestRun.length)bestRun=cur.slice();}else cur=[];}if(bestRun.length<=max)break;let candidates=bestRun.filter(d=>!hardOff(s,d)&&!employeeMustWork(s,d));let done=false;for(const d of candidates.sort((a,b)=>dayQuality(a)-dayQuality(b))){if(EMP(s)&&publicOffCount(s)>=8)continue;if(canRemove(s,d)){delShift(s,d);fillDayAfterEmployeeOff(d);done=true;break;}}if(!done)break;}}
+  function repairRuns(){for(const s of H()){let max=Number(s.max||6),guard=0;while(guard++<20){let bestRun=[],cur=[];for(const d of dates){if(shift(s,d)){cur.push(d);if(cur.length>bestRun.length)bestRun=cur.slice();}else cur=[];}if(bestRun.length<=max)break;let candidates=bestRun.filter(d=>!hardOff(s,d)&&!employeeMustWork(s,d));let best=null;for(const d of candidates){if(EMP(s)&&publicOffCount(s)>=8)continue;let snap=snapshotDay(d),before=dayQuality(d);delShift(s,d);reflowEmployees(d);fillDayAfterEmployeeOff(d);repairClose(d);let q=dayQuality(d);restoreDay(d,snap);if(!best||q<best.q)best={d,q,before};}if(!best||best.q>550)break;delShift(s,best.d);reflowEmployees(best.d);fillDayAfterEmployeeOff(best.d);repairClose(best.d);}}
   }
   function ensurePublicOffExact(){// 8休を超えている社員は、成立する日に戻す。
-    for(const e of H().filter(EMP)){let guard=0;while(publicOffCount(e)>8&&guard++<20){let opts=[];for(const d of dates){if(shift(e,d)||paid(e,d)||hardOff(e,d)||softOff(e,d))continue;let p=employeePattern(e,d),snap=snapshotDay(d);setShift(e,d,p[0],p[1]);let q=dayQuality(d);restoreDay(d,snap);opts.push({d,p,q});}opts.sort((a,b)=>a.q-b.q);if(!opts.length)break;setShift(e,opts[0].d,...opts[0].p);}}
+    for(const e of H().filter(EMP)){let guard=0;while(publicOffCount(e)>8&&guard++<20){let opts=[];for(const d of dates){if(shift(e,d)||paid(e,d)||hardOff(e,d)||softOff(e,d))continue;let p=employeePattern(e,d),snap=snapshotDay(d);setShift(e,d,p[0],p[1]);let q=dayQuality(d);restoreDay(d,snap);opts.push({d,p,q});}opts.sort((a,b)=>a.q-b.q);if(!opts.length)break;setShift(e,opts[0].d,...opts[0].p);reflowEmployees(opts[0].d);}}
   }
-  function validate(){let out=[];for(const d of dates){let k=K(d),c=C(d);let n=H().filter(s=>shift(s,d)?.start===9);if(n.length!==1)out.push(`${k}:9時入り${n.length}人`);for(let h=11;h<c;h++){let a=active(d,h),t=requiredCount(d,h,a);if(!hardCoverage(d,h,a))out.push(`${k}:${h}時 営業条件NG`);if(a.length<t-1)out.push(`${k}:${h}時 人数が薄い ${a.length}/${t}`);}let z=active(d,c-.01);if(z.length<3||!z.some(DC)||!z.some(RC))out.push(`${k}:締め不足`);
+  function closeOK(d){let z=active(d,C(d)-0.01);return z.length>=3&&z.some(DC)&&z.some(RC);}
+  function repairClose(d){let c=C(d),guard=0;while(!closeOK(d)&&guard++<8){let before=dayQuality(d),opts=[];
+    // まず既存の遅番/学生を後ろへずらして締めまで届かせる。前の時間帯が壊れない案だけ採用。
+    for(const s of H().filter(x=>(LATE(x)||STU(x))&&shift(x,d))){let cur=shift(s,d);if(cur.end>=c)continue;for(const p of lateStudentPatterns(s,d)){if(p[1]!==c||p[0]<=cur.start)continue;let snap=snapshotDay(d);setShift(s,d,p[0],p[1]);let ok=true;for(let h=11;h<c;h++)if(!hardCoverage(d,h)){ok=false;break;}let q=dayQuality(d);restoreDay(d,snap);if(ok)opts.push({s,p,q,move:1});}}
+    // 次に未出勤者をラスト要員として追加。
+    for(const s of H().filter(x=>(LATE(x)||STU(x))&&!shift(x,d)&&allowed(x,d))){for(const p of lateStudentPatterns(s,d)){if(p[1]!==c)continue;opts.push({s,p,q:before+totalHours(s)*0.1,move:0});}}
+    opts.sort((a,b)=>{let za=(DC(a.s)?-160:0)+(RC(a.s)?-160:0)+(BPLUS(a.s)?-80:0)+a.q,zb=(DC(b.s)?-160:0)+(RC(b.s)?-160:0)+(BPLUS(b.s)?-80:0)+b.q;return za-zb;});
+    if(!opts.length)break;let o=opts[0];setShift(o.s,d,o.p[0],o.p[1]);
+  }}
+  function optimizeLateStarts(){for(const d of dates){let baseQ=dayQuality(d),lates=H().filter(s=>LATE(s)&&shift(s,d)).sort((a,b)=>shift(a,d).start-shift(b,d).start);for(const s of lates){let cur=shift(s,d),patterns=lateStudentPatterns(s,d).filter(p=>p[0]>cur.start).sort((a,b)=>b[0]-a[0]);for(const p of patterns){let snap=snapshotDay(d);setShift(s,d,p[0],p[1]);let q=dayQuality(d),ok=q<=baseQ+20;for(let h=11;h<C(d)&&ok;h++)if(!hardCoverage(d,h))ok=false;if(ok){baseQ=q;break;}restoreDay(d,snap);}}}}
+  function validate(){let out=[];for(const d of dates){let k=K(d),c=C(d);let n=H().filter(s=>shift(s,d)?.start===9);if(n.length!==1)out.push(`${k}:9時入り${n.length}人`);if(!physical(d,11).some(EMP))out.push(`${k}:11時社員なし`);for(let h=11;h<c;h++){let a=active(d,h),t=requiredCount(d,h,a);if(!hardCoverage(d,h,a))out.push(`${k}:${h}時 営業条件NG`);if(a.length<t-1)out.push(`${k}:${h}時 人数が薄い ${a.length}/${t}`);}let z=active(d,c-.01);if(z.length<3||!z.some(DC)||!z.some(RC))out.push(`${k}:締め不足`);
       for(const e of H().filter(EMP)){if(paid(e,d)&&shift(e,d))out.push(`${k}:${e.name} 有給日に出勤`);if(employeeMustWork(e,d)&&!shift(e,d))out.push(`${k}:${e.name} イベント参加なのに非出勤`);let p=shift(e,d);if(p&&Math.abs((p.end-p.start)-9)>0.01&&RQ(e,d).m!=='時間')out.push(`${k}:${e.name} 社員9時間外`);}
     }
     for(const e of H().filter(EMP)){if(publicOffCount(e)!==8)out.push(`${e.name}:公休${publicOffCount(e)}日`);}
@@ -7892,7 +7926,7 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
     let frees=H().filter(s=>LATE(s)&&!STU(s)),students=H().filter(STU);if(frees.length&&students.length){let minF=Math.min(...frees.map(totalHours)),maxS=Math.max(...students.map(totalHours));if(maxS>minF+6)out.push(`学生勤務時間がフリーバイトを大きく上回る ${maxS.toFixed(0)}h/${minF.toFixed(0)}h`);}
     return [...new Set(out)];
   }
-  window.v168AutoHall=function(){let real=window.alert;window.alert=()=>{};try{
+  window.v169AutoHall=function(){let real=window.alert;window.alert=()=>{};try{
       schedule={};
       // 1) 早番→社員→中番/遅番で各日をゼロから構築
       for(const d of dates)buildDay(d);
@@ -7902,16 +7936,17 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
       trimOverstaff();
       // 4) 連勤を修正して、崩れた日を再補修
       repairRuns();for(const d of dates)fillDayAfterEmployeeOff(d);
-      // 5) 有給/イベントを含め最終補修
-      for(const d of dates){let r=eventRange(K(d));if(r)fillDayAfterEmployeeOff(d);}ensurePublicOffExact();
+      // 5) 有給/イベントを含め最終補修。社員11時リレーと遅番の不要な早出しも再評価。
+      for(const d of dates){reflowEmployees(d);let r=eventRange(K(d));if(r)fillDayAfterEmployeeOff(d);}ensurePublicOffExact();
+      for(const d of dates){reflowEmployees(d);repairClose(d);}optimizeLateStarts();for(const d of dates)repairClose(d);
     }finally{window.alert=real;}
-    window.v168Issues=validate();quickSave();renderAll();real(window.v168Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v168Issues.length}件`:'ホールの自動生成をしました');
+    window.v169Issues=validate();quickSave();renderAll();real(window.v169Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v169Issues.length}件`:'ホールの自動生成をしました');
   };
-  window.v168Validate=validate;
-  window.autoMake=function(){return window.v168AutoHall();};window.v62AutoMake=window.autoMake;
+  window.v169Validate=validate;
+  window.autoMake=function(){return window.v169AutoHall();};window.v62AutoMake=window.autoMake;
   window.renderWarnings=function(){let u=validate();warnings.innerHTML=u.length?u.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">大きな警告はありません。</p>';};
 })();
-// ===== /v168 =====
+// ===== /v169 =====
 </script>
 
 </body>
