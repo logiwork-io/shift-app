@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1人管理用シフト生成アプリ v213</title>
+<title>1人管理用シフト生成アプリ v233</title>
 <style>
 :root{--a:#00a6a6;--b:#76c7c9;--s:#e8f8f8;--l:#dceced;--t:#1f2a2c;--m:#6e7f82;--bg:#f7fbfb}
 *{box-sizing:border-box}
@@ -245,7 +245,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 </style>
 </head>
 <body>
-<header><h1>1人管理用シフト生成アプリ v213</h1><div class="sub">希望入力拡張・育成優先・戦力構成版</div></header>
+<header><h1>1人管理用シフト生成アプリ v233</h1><div class="sub">希望入力拡張・育成優先・戦力構成版</div></header>
 
 <main>
 <section class="card">
@@ -8914,3 +8914,227 @@ window.autoMake=function(){return window.v213AutoHall();};window.v62AutoMake=win
 })();
 // ===== /v227 =====
 </script>
+
+
+<script>
+// ===== v229 effective final patch: preview marks / strict employee weekends / fair weekend free =====
+(()=>{
+  const BASE = window.v227AutoHall || window.autoMake;
+  const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール');
+  const EMP=s=>s.employment==='社員';
+  const CAT=s=>staffCategory(s);
+  const FREE=s=>['バイト 遅番','バイト フリー'].includes(CAT(s));
+  const R=(s,d)=>requests?.[s.id]?.[K(d)]||{};
+  const SH=(s,d)=>schedule?.[K(d)]?.[s.id]||null;
+  const HARD=(s,d)=>['×','有給'].includes(R(s,d).m);
+  const SOFT=(s,d)=>R(s,d).m==='△';
+  const isWK=d=>isWeekend(d);
+  const close=d=>closeHour(d);
+
+  function maxRun(s){let r=0,m=0;for(const d of dates){if(SH(s,d)){r++;m=Math.max(m,r)}else r=0;}return m;}
+  function employeePattern(e,d){
+    let st=(e.name==='佐野'||Number(e.bs)<=11)?11:13;
+    if(st>13)st=13;
+    let en=Math.min(close(d),st+9);
+    if(e.name==='佐野')en=Math.min(close(d),20);
+    return {label:String(st),start:st,end:en};
+  }
+  function employeeCount(d){return H().filter(e=>EMP(e)&&SH(e,d)).length;}
+  function canMoveRest(e,fromD,toD){
+    if(!SH(e,fromD)||SH(e,toD)||isWK(fromD)||!isWK(toD))return false;
+    if(HARD(e,toD)||SOFT(e,toD))return false;
+    if(e.weekend===false)return false;
+    const fk=K(fromD),tk=K(toD),old=SH(e,fromD),snapFrom={...(schedule[fk]||{})},snapTo={...(schedule[tk]||{})};
+    delete schedule[fk][e.id];
+    schedule[tk]??={}; schedule[tk][e.id]=employeePattern(e,toD);
+    let ok=maxRun(e)<=Number(e.max||6);
+    schedule[fk]=snapFrom;schedule[tk]=snapTo;
+    return ok;
+  }
+  function repairEmployeeWeekends(){
+    for(const e of H().filter(EMP)){
+      for(const d of dates){
+        if(!isWK(d)||SH(e,d)||HARD(e,d)||SOFT(e,d))continue;
+        // 希望なし土日祝の自動公休は禁止。平日の自動公休へ移す。
+        let candidates=dates.filter(x=>!isWK(x)&&SH(e,x)&&!HARD(e,x)&&!SOFT(e,x));
+        candidates.sort((a,b)=>employeeCount(b)-employeeCount(a));
+        let moved=false;
+        for(const wd of candidates){if(!canMoveRest(e,wd,d))continue;
+          delete schedule[K(wd)][e.id];
+          schedule[K(d)]??={};schedule[K(d)][e.id]=employeePattern(e,d);
+          moved=true;break;
+        }
+        // 平日へ移せない場合でも、希望なし土日休みを作らない。警告対象として出勤を優先。
+        if(!moved){schedule[K(d)]??={};schedule[K(d)][e.id]=employeePattern(e,d);}
+      }
+    }
+  }
+  function allowedSwap(s,d,p){
+    if(!p||HARD(s,d)||(s.weekend===false&&isWK(d))||p.start>p.end||p.end-p.start>9)return false;
+    if(typeof v73AllowedShift==='function'&&!v73AllowedShift(s,d,p.start,p.end,true))return false;
+    return true;
+  }
+  function fairWeekendFree(){
+    const people=H().filter(s=>FREE(s)&&s.otherMode==='土日祝'&&s.os!==''&&Number(s.os)<=11);
+    if(people.length<2)return;
+    const earlyCount=s=>dates.filter(d=>isWK(d)&&SH(s,d)&&Number(SH(s,d).start)<=14).length;
+    // 同じ日に2人とも出勤していて開始時間が異なる場合、勤務時間そのものを交換するだけなら日別人数は不変。
+    for(let guard=0;guard<50;guard++){
+      let counts=people.map(s=>({s,n:earlyCount(s)})).sort((a,b)=>b.n-a.n);
+      if(counts[0].n-counts[counts.length-1].n<=1)break;
+      let hi=counts[0].s,lo=counts[counts.length-1].s,done=false;
+      for(const d of dates){if(!isWK(d))continue;let a=SH(hi,d),b=SH(lo,d);if(!a||!b)continue;
+        if(Number(a.start)>14||Number(b.start)<=14)continue;
+        let pa={...a},pb={...b}; if(!allowedSwap(hi,d,pb)||!allowedSwap(lo,d,pa))continue;
+        schedule[K(d)][hi.id]={...pb,label:String(pb.start)};schedule[K(d)][lo.id]={...pa,label:String(pa.start)};done=true;break;
+      }
+      if(!done)break;
+    }
+  }
+  function issues(){
+    let out=[];
+    for(const d of dates){
+      for(const e of H().filter(EMP)){
+        let p=SH(e,d);
+        if(p&&Number(p.start)>13)out.push(`${K(d)}:${e.name} 社員13時以降開始`);
+        if(isWK(d)&&!p&&!HARD(e,d)&&!SOFT(e,d))out.push(`${K(d)}:${e.name} 希望なし土日祝自動公休`);
+      }
+    }
+    return out;
+  }
+  window.v229AutoHall=function(){
+    const real=window.alert;window.alert=()=>{};
+    try{BASE();repairEmployeeWeekends();fairWeekendFree();repairEmployeeWeekends();fairWeekendFree();}
+    finally{window.alert=real;}
+    window.v229Issues=[...new Set([...(window.v227Validate?window.v227Validate():[]),...issues()])];
+    quickSave();renderAll();
+    real(window.v229Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v229Issues.length}件`:'ホールの自動生成をしました');
+  };
+  window.v229Validate=()=>[...new Set([...(window.v227Validate?window.v227Validate():[]),...issues()])];
+  window.autoMake=window.v229AutoHall;window.v62AutoMake=window.autoMake;
+
+  // 最終プレビュー表示。／は「本当に出勤可能だが自動で休み」の場合だけ。
+  window.renderPreview=function(){
+    const title=month.selectedOptions[0].textContent,list=H();
+    const evrow='<tr><th></th>'+dates.map(d=>`<th><div class="previewEvent">${eventDisplay(K(d))}</div></th>`).join('')+'</tr>';
+    const head='<tr><th></th>'+dates.map(d=>`<th>${d.getDate()}<br>${wd(d)}</th>`).join('')+'</tr>';
+    let rows='',prev=null;
+    for(const s of list){const g=staffCategory(s);if(prev!==null&&g!==prev)rows+=`<tr class="groupGap"><td colspan="${dates.length+1}"></td></tr>`;
+      rows+='<tr><td>'+s.name+'</td>'+dates.map(d=>{let p=SH(s,d),r=R(s,d),text;
+        if(p) text=(r.m==='△'?'△':'')+p.label;
+        else if(r.m==='有給') text='有給';
+        else if(r.m==='×'||r.m==='△') text='×';
+        else if(s.input==='work'&&!['○','時間'].includes(r.m)) text='×';
+        else if(s.weekend===false&&isWK(d)) text='×';
+        else text='／';
+        return '<td>'+text+'</td>';}).join('')+'</tr>';prev=g;}
+    sheet.innerHTML=`<div class="miniTitle">${title} ホールシフト</div><table class="pt">${evrow}${head}${rows}</table>`;
+  };
+})();
+// ===== /v229 =====
+</script>
+
+
+<script>
+// ===== v232 employee monthly calendar optimizer =====
+(()=>{
+  const BASE=window.v229AutoHall||window.autoMake;
+  const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール'), EMP=s=>s.employment==='社員';
+  const R=(s,d)=>requests?.[s.id]?.[K(d)]||{}, SH=(s,d)=>schedule?.[K(d)]?.[s.id]||null;
+  const WK=d=>isWeekend(d), EV=(s,d)=>!!eventAttend?.[K(d)]?.[s.id];
+  function pat(e,d){let st=(e.name==='佐野'||Number(e.bs)<=11)?11:13;if(st>13)st=13;let en=Math.min(closeHour(d),st+9);if(e.name==='佐野')en=Math.min(closeHour(d),20);return {label:String(st),start:st,end:en};}
+  function perms(a){if(a.length<=1)return[a];let out=[];for(let i=0;i<a.length;i++)for(const p of perms(a.slice(0,i).concat(a.slice(i+1))))out.push([a[i],...p]);return out;}
+  function optimizeOne(e,occupied,orig){
+    const max=Number(e.max||6), fixedX=dates.filter(d=>R(e,d).m==='×').length, target=Math.max(8,fixedX);
+    // state key = publicOffCount|consecutiveWork; value = {cost,path,lastOff}
+    let dp=new Map([['0|0',{cost:0,path:[],lastOff:false}]]);
+    for(let i=0;i<dates.length;i++){
+      const d=dates[i],k=K(d),r=R(e,d), paid=r.m==='有給', hard=r.m==='×', soft=r.m==='△', event=EV(e,d);
+      const wasWork=!!orig[k]?.[e.id], weekend=WK(d);
+      let ndp=new Map();
+      for(const [key,v] of dp){let [offc,run]=key.split('|').map(Number);
+        const acts=[];
+        if(paid||hard) acts.push('off');
+        else if(event) acts.push('work');
+        else if(weekend&&!soft) acts.push('work');
+        else {acts.push('work');acts.push('off');}
+        for(const a of acts){
+          if(a==='work'){
+            let nr=run+1;if(nr>max)continue;let c=v.cost+(wasWork?0:4)+(soft?22:0);
+            let nk=`${offc}|${nr}`,nv={cost:c,path:[...v.path,false],lastOff:false};if(!ndp.has(nk)||c<ndp.get(nk).cost)ndp.set(nk,nv);
+          }else{
+            let inc=paid?0:1,no=offc+inc;if(no>target)continue;
+            // An automatic/soft rest may overlap another employee only as a last resort; hard/paid requests can overlap.
+            let overlap=occupied.has(k)&&!hard&&!paid?800:0;
+            let c=v.cost+(wasWork?6:0)+(soft?-15:0)+overlap+(v.lastOff?-1:0);
+            let nk=`${no}|0`,nv={cost:c,path:[...v.path,true],lastOff:true};if(!ndp.has(nk)||c<ndp.get(nk).cost)ndp.set(nk,nv);
+          }
+        }
+      }
+      dp=ndp;
+    }
+    let best=null;for(const [key,v] of dp){let [offc]=key.split('|').map(Number);if(offc!==target)continue;if(!best||v.cost<best.cost)best=v;}
+    return best;
+  }
+  function rebuildEmployees(){
+    const es=H().filter(EMP), orig=JSON.parse(JSON.stringify(schedule)); let bestAll=null;
+    for(const order of perms(es)){
+      let occupied=new Set(),plans=new Map(),cost=0,ok=true;
+      for(const e of order){let b=optimizeOne(e,occupied,orig);if(!b){ok=false;break;}plans.set(e.id,b.path);cost+=b.cost;for(let i=0;i<b.path.length;i++)if(b.path[i]&&R(e,dates[i]).m!=='有給')occupied.add(K(dates[i]));}
+      if(ok&&(!bestAll||cost<bestAll.cost))bestAll={cost,plans};
+    }
+    if(!bestAll)return false;
+    for(const e of es){
+      // Clear employee across month, then rebuild work days from optimized rest calendar.
+      for(const d of dates){schedule[K(d)]??={};delete schedule[K(d)][e.id];}
+      const path=bestAll.plans.get(e.id);
+      for(let i=0;i<dates.length;i++){if(path[i])continue;let d=dates[i],k=K(d),old=orig[k]?.[e.id];let p=old&&Number(old.start)<=13?{...old}:pat(e,d);if(Number(p.start)>13)p=pat(e,d);schedule[k][e.id]=p;}
+    }
+    return true;
+  }
+  function maxRun(e){let r=0,m=0;for(const d of dates){if(SH(e,d)){r++;m=Math.max(m,r)}else r=0;}return m;}
+  function issues(){let out=[];const es=H().filter(EMP);for(const d of dates){let auto=[];for(const e of es){let p=SH(e,d),m=R(e,d).m;if(p&&Number(p.start)>13)out.push(`${K(d)}:${e.name} 社員13時以降開始`);if(WK(d)&&!p&&!['×','△','有給'].includes(m))out.push(`${K(d)}:${e.name} 希望なし土日祝自動公休`);if(EV(e,d)&&!['×','有給'].includes(m)&&!p)out.push(`${K(d)}:${e.name} イベント参加なのに非出勤`);if(!p&&!['×','△','有給'].includes(m))auto.push(e.name);}if(!WK(d)&&auto.length>1)out.push(`${K(d)}:社員自動公休重複 ${auto.join('/')}`);let nine=H().filter(s=>SH(s,d)?.start===9).length;if(nine!==1)out.push(`${K(d)}:9時担当${nine}人`);}for(const e of es){let paid=dates.filter(d=>R(e,d).m==='有給').length,work=dates.filter(d=>SH(e,d)).length,publicOff=dates.length-work-paid;if(publicOff<8)out.push(`${e.name}:公休${publicOff}日`);if(maxRun(e)>Number(e.max||6))out.push(`${e.name}:最大連勤${maxRun(e)}日`);}return out;}
+  window.v232AutoHall=function(){const real=window.alert;window.alert=()=>{};try{BASE();rebuildEmployees();}finally{window.alert=real;}window.v232Issues=[...new Set(issues())];quickSave();renderAll();real(window.v232Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v232Issues.length}件`:'ホールの自動生成をしました');};
+  window.v232Validate=()=>[...new Set(issues())];window.autoMake=window.v232AutoHall;window.v62AutoMake=window.autoMake;
+})();
+// ===== /v232 =====
+</script>
+
+
+
+<script>
+// ===== v233 final employee overlap repair =====
+(()=>{
+  const BASE=window.v232AutoHall||window.autoMake;
+  const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール'), EMP=s=>s.employment==='社員';
+  const R=(s,d)=>requests?.[s.id]?.[K(d)]||{}, SH=(s,d)=>schedule?.[K(d)]?.[s.id]||null, WK=d=>isWeekend(d);
+  function pat(e,d){let st=(e.name==='佐野'||Number(e.bs)<=11)?11:13;if(st>13)st=13;let en=Math.min(closeHour(d),st+9);if(e.name==='佐野')en=Math.min(closeHour(d),20);return {label:String(st),start:st,end:en};}
+  function maxRun(e){let r=0,m=0;for(const d of dates){if(SH(e,d)){r++;m=Math.max(m,r)}else r=0;}return m;}
+  function autoOffs(d){return H().filter(EMP).filter(e=>!SH(e,d)&&!['×','△','有給'].includes(R(e,d).m));}
+  function repair(){
+    for(let guard=0;guard<20;guard++){
+      let changed=false;
+      for(const d of dates){if(WK(d))continue;let offs=autoOffs(d);if(offs.length<=1)continue;
+        // Restore one of the overlapping auto-rest employees and move that rest to a clean weekday.
+        let done=false;
+        for(const e of offs.slice().reverse()){
+          for(const rd of dates){if(WK(rd)||!SH(e,rd)||['×','△','有給'].includes(R(e,rd).m))continue;
+            if(autoOffs(rd).length)continue;
+            const dk=K(d),rk=K(rd),sd={...(schedule[dk]||{})},sr={...(schedule[rk]||{})};
+            schedule[dk]??={};schedule[dk][e.id]=pat(e,d);delete schedule[rk][e.id];
+            if(maxRun(e)<=Number(e.max||6)&&autoOffs(d).length<=1&&autoOffs(rd).length<=1){changed=true;done=true;break;}
+            schedule[dk]=sd;schedule[rk]=sr;
+          }
+          if(done)break;
+        }
+      }
+      if(!changed)break;
+    }
+  }
+  function issues(){let out=[];for(const d of dates){let a=autoOffs(d);if(!WK(d)&&a.length>1)out.push(`${K(d)}:社員自動公休重複 ${a.map(x=>x.name).join('/')}`);for(const e of H().filter(EMP)){let p=SH(e,d),m=R(e,d).m;if(p&&p.start>13)out.push(`${K(d)}:${e.name} 社員13時以降開始`);if(WK(d)&&!p&&!['×','△','有給'].includes(m))out.push(`${K(d)}:${e.name} 希望なし土日祝自動公休`);}}return out;}
+  window.v233AutoHall=function(){const real=window.alert;window.alert=()=>{};try{BASE();repair();}finally{window.alert=real;}window.v233Issues=[...new Set([...(window.v232Validate?window.v232Validate():[]).filter(x=>!x.includes('社員自動公休重複')),...issues()])];quickSave();renderAll();real(window.v233Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v233Issues.length}件`:'ホールの自動生成をしました');};
+  window.v233Validate=()=>[...new Set([...(window.v232Validate?window.v232Validate():[]).filter(x=>!x.includes('社員自動公休重複')),...issues()])];window.autoMake=window.v233AutoHall;window.v62AutoMake=window.autoMake;
+})();
+// ===== /v233 =====
+</script>
+
