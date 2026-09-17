@@ -10263,3 +10263,230 @@ window.saveData=async function(){localStorage.setItem(storeKey,JSON.stringify({s
 
 // ===== /本番版 =====
 </script>
+
+
+<style id="prod-v26-ui-final">
+/* 仕様画面 v2.6 — 生成エンジンは変更しない */
+@media (max-width:700px){
+  body:not(.prodStaffMode) main{padding-left:4px!important;padding-right:4px!important}
+  body:not(.prodStaffMode) .card{margin-left:0!important;margin-right:0!important;padding-left:8px!important;padding-right:8px!important}
+  #prodAdminReqCalendar{width:100%!important}
+}
+#prodAdminReqCalendar .prodCal,
+#prodRequestGrid .prodCal{grid-template-columns:repeat(7,minmax(0,1fr))!important;width:100%!important;gap:3px!important}
+#prodAdminReqCalendar .prodCalDay,
+#prodRequestGrid .prodCalDay{min-width:0!important;padding:5px!important;box-sizing:border-box}
+#prodAdminReqCalendar .prodCalDay{min-height:116px!important;cursor:pointer}
+#prodRequestGrid .prodCalDay{min-height:104px!important;cursor:pointer}
+.prodCalendarTitle{text-align:center;font-weight:900;font-size:22px;margin:4px 0 12px}
+.prodCalDay .dn{font-size:17px;font-weight:900;line-height:1.15}
+.prodDayAdjBadge{display:inline-block;margin-left:4px;padding:1px 5px;border-radius:999px;background:#e7f5f3;color:#16736d;font-size:11px;font-weight:900}
+.prodReqSummary{margin-top:7px;font-size:11px;font-weight:800;line-height:1.25;word-break:break-word}
+.prodReqSummary.off{color:#b83e50}.prodReqSummary.work{color:#17745b}.prodReqSummary.soft{color:#9a6a00}.prodReqSummary.paid{color:#7650a8}
+.prodModal{position:fixed;inset:0;z-index:200000;background:#0007;display:flex;align-items:center;justify-content:center;padding:14px}
+.prodModal.hide{display:none}
+.prodModalBox{width:min(560px,96vw);max-height:86vh;overflow:auto;background:#fff;border-radius:20px;padding:18px;box-sizing:border-box}
+.prodModalHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.prodModalHead h3{margin:0;font-size:22px}
+.prodModalClose{margin:0!important;padding:9px 13px!important}
+.prodAdjLine{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e7eeee}
+.prodAdjLine select{width:110px}
+.prodPickStaff{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
+.prodPickStaff button{margin:0;text-align:left}
+.prodPickStaff button.on{outline:3px solid #42aaa4}
+.prodPickStaff button.offType{background:#f9dfe3;color:#8f3040}
+.prodPickStaff button.workType{background:#dff3e8;color:#176844}
+.prodStaffChoice{display:grid;grid-template-columns:1fr;gap:9px}
+.prodStaffChoice button{margin:0;text-align:left}
+.prodStaffChoice button.selected{outline:3px solid #42aaa4}
+.prodTimeEditor{display:grid;grid-template-columns:1fr auto 1fr;gap:7px;align-items:center;margin-top:10px}
+.prodTimeEditor select{width:100%}
+.prodStaffPreview .prodPreviewScroll{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+.prodStaffPreview table{width:max-content!important;min-width:1100px!important;table-layout:auto!important}
+.prodStaffTabs{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:7px!important}
+.prodStaffTabs button{margin:0!important}
+</style>
+
+<script id="prod-v26-ui-final">
+(function(){
+  const DAYN='日月火水木金土';
+  window.prodStaffDraft = window.prodStaffDraft || {};
+
+  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function dateLabel(k){
+    const d=new Date(k+'T00:00:00');
+    return `${d.getMonth()+1}月${d.getDate()}日（${DAYN[d.getDay()]}）`;
+  }
+  function ensureModal(){
+    let m=document.getElementById('prodUnifiedModal');
+    if(m)return m;
+    m=document.createElement('div');m.id='prodUnifiedModal';m.className='prodModal hide';
+    m.innerHTML='<div class="prodModalBox"><div class="prodModalHead"><h3 id="prodUnifiedTitle"></h3><button class="sec prodModalClose" onclick="prodCloseUnifiedModal()">閉じる</button></div><div id="prodUnifiedBody"></div></div>';
+    document.body.appendChild(m);return m;
+  }
+  window.prodCloseUnifiedModal=function(){ensureModal().classList.add('hide')};
+
+  function dayLabel(d,startMonth){
+    return (d.getDate()===1 && d.getMonth()!==startMonth)?`${d.getMonth()+1}/1`:String(d.getDate());
+  }
+
+  // 管理者カレンダー：補正プルダウンは常設せず、日付タップ後に設定
+  window.prodRenderAdminCalendar=function(){
+    const host=document.getElementById('prodAdminReqCalendar');
+    if(!host||!window.dates||!dates.length)return;
+    const first=dates[0],startMonth=first.getMonth(),cells=[];
+    for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');
+    for(const d of dates){
+      const k=ymd(d),w=d.getDay(),holiday=typeof prodHolidayLike==='function'&&prodHolidayLike(d),lab=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'',chips=[];
+      for(const s of staff.filter(x=>x.role==='ホール')){
+        const r=reqObj(s.id,k); if(!r.m)continue;
+        const tm=r.m==='時間'?(r.h||r.ts||''):'';
+        chips.push(`<span class="reqChip ${s.input==='work'?'reqWork':'reqOff'}">${esc(s.name)}${tm!==''?' '+esc(tm)+'〜':''}</span>`);
+      }
+      const adj=Number((window.prodDayAdjust||{})[k]||0);
+      cells.push(`<div class="prodCalDay adminCalDay ${w===0?'sun ':w===6?'sat ':''}${holiday?'holidayLike weekendLike':''}" onclick="prodOpenDayPicker('${k}')">
+        <div class="dayTop"><span class="dn">${dayLabel(d,startMonth)}${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</span></div>
+        ${lab?`<div class="holidayName">${esc(lab)}</div>`:''}<div class="chips">${chips.join('')}</div>
+      </div>`);
+    }
+    const status=window.prodAdminInputMode==='submitted'
+      ?`<div class="submittedNote">提出済み：${prodSubmissionStatus.done.length}人　未提出：${prodSubmissionStatus.missing.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';
+    host.innerHTML=`<div class="calModeTitle">${window.prodAdminInputMode==='submitted'?'提出された希望休':'希望休を記入'}</div>${status}
+      <div class="prodCalendarTitle">${first.getFullYear()}年${first.getMonth()+1}月</div>
+      <div class="adminCalLegend"><span class="legendChip reqOff">休み記入</span><span class="legendChip reqWork">出勤記入</span></div>
+      <div class="prodCal adminCalWrap"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>`;
+  };
+
+  window.prodOpenDayPicker=function(k){
+    ensureModal();
+    document.getElementById('prodUnifiedTitle').textContent=dateLabel(k);
+    const adj=Number((window.prodDayAdjust||{})[k]||0);
+    const readonly=window.prodAdminInputMode==='submitted';
+    const rows=staff.filter(s=>s.role==='ホール').map(s=>{
+      const r=reqObj(s.id,k),on=!!r.m,isWork=s.input==='work',tm=r.m==='時間'?(r.h||r.ts||''):'';
+      if(readonly){
+        if(!on)return '';
+        return `<button class="${isWork?'workType':'offType'} on" disabled>${esc(s.name)}　${isWork?'出勤':'休み'}${tm!==''?' '+esc(tm)+'〜':''}</button>`;
+      }
+      return `<button class="${isWork?'workType':'offType'} ${on?'on':''}" onclick="prodToggleAdminReq('${s.id}','${k}')">${esc(s.name)}　${isWork?'出勤':'休み'}${tm!==''?' '+esc(tm)+'〜':''}</button>`;
+    }).join('');
+    document.getElementById('prodUnifiedBody').innerHTML=
+      `<div class="prodAdjLine"><b>人数補正</b><select onchange="prodSetDayAdjust('${k}',this.value);prodRenderAdminCalendar()">
+        ${[-2,-1,0,1,2].map(v=>`<option value="${v}" ${v===adj?'selected':''}>${v>0?'+':''}${v}</option>`).join('')}
+      </select></div>
+      ${readonly?'<div class="note" style="margin-top:10px">提出された内容</div>':'<div class="note" style="margin-top:10px">スタッフ名を押すと登録／解除できます。</div>'}
+      <div class="prodPickStaff">${rows||'<div class="note">この日の提出内容はありません。</div>'}</div>`;
+    ensureModal().classList.remove('hide');
+  };
+
+  window.prodToggleAdminReq=function(id,k){
+    const s=staff.find(x=>String(x.id)===String(id)); if(!s)return;
+    const r=reqObj(s.id,k);
+    if(r.m){r.m='';r.h='';r.end='';}
+    else {r.m=s.input==='work'?'○':'×';r.h='';r.end='';}
+    quickSave();prodRenderAdminCalendar();prodOpenDayPicker(k);
+  };
+
+  // スタッフ希望提出：カレンダーは結果表示、入力は日付タップ後
+  function summaryClass(m){return m==='×'?'off':m==='○'?'work':m==='△'?'soft':m==='有給'?'paid':'work'}
+  function summaryText(r){
+    if(!r||!r.m)return '';
+    if(r.m==='○')return '出勤希望';
+    if(r.m==='×')return '休み希望';
+    if(r.m==='△')return 'できれば休み';
+    if(r.m==='有給')return '有給';
+    if(r.m==='時間')return `${r.h||''}時〜${r.end||''}時`;
+    return r.m;
+  }
+  window.prodRenderRequestForm=function(){
+    const ms=prodBoot?.monthStart,month=document.getElementById('prodRequestMonth'),g=document.getElementById('prodRequestGrid');
+    if(!ms){month.textContent='管理者が対象月を設定すると入力できます';g.innerHTML='';return}
+    const ds=prodMonthDates(ms),first=ds[0],startMonth=first.getMonth(),cells=[];
+    month.innerHTML=`<div class="prodCalendarTitle">${first.getFullYear()}年${first.getMonth()+1}月</div>`;
+    for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');
+    for(const d of ds){
+      const k=ymd(d),w=d.getDay(),r=prodStaffDraft[k]||{},txt=summaryText(r);
+      cells.push(`<div class="prodReqRow prodCalDay ${w===0?'sun ':w===6?'sat ':''}" data-date="${k}" onclick="prodOpenStaffDay('${k}')">
+        <div class="dn">${dayLabel(d,startMonth)}</div>${txt?`<div class="prodReqSummary ${summaryClass(r.m)}">${esc(txt)}</div>`:'<div class="prodReqSummary note">未入力</div>'}
+      </div>`);
+    }
+    g.innerHTML=`<div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>`;
+  };
+
+  window.prodOpenStaffDay=function(k){
+    ensureModal();document.getElementById('prodUnifiedTitle').textContent=dateLabel(k);
+    const cur=prodStaffDraft[k]||{},hours=Array.from({length:15},(_,i)=>i+9);
+    const choices=[['○','出勤希望'],['×','休み希望'],['△','できれば休み'],['時間','時間指定'],['有給','有給']];
+    document.getElementById('prodUnifiedBody').innerHTML=
+      `<div class="prodStaffChoice">${choices.map(([v,l])=>`<button class="${cur.m===v?'selected':''}" onclick="prodChooseStaffReq('${k}','${v}')">${l}</button>`).join('')}
+      <button class="sec" onclick="prodChooseStaffReq('${k}','')">入力を消す</button></div>
+      <div id="prodStaffTimeBox" class="${cur.m==='時間'?'':'hide'}">
+        <div class="prodTimeEditor">
+          <select id="prodStaffStart">${hours.map(h=>`<option value="${h}" ${String(cur.h||17)===String(h)?'selected':''}>${h}時</option>`).join('')}</select>
+          <span>〜</span>
+          <select id="prodStaffEnd">${hours.map(h=>`<option value="${h}" ${String(cur.end||23)===String(h)?'selected':''}>${h}時</option>`).join('')}</select>
+        </div>
+        <button style="margin-top:10px" onclick="prodSaveStaffTime('${k}')">この時間で決定</button>
+      </div>`;
+    ensureModal().classList.remove('hide');
+  };
+  window.prodChooseStaffReq=function(k,m){
+    if(!m){delete prodStaffDraft[k];prodCloseUnifiedModal();prodRenderRequestForm();return}
+    if(m==='時間'){prodStaffDraft[k]={m:'時間',h:17,end:23,d:'from'};prodOpenStaffDay(k);return}
+    prodStaffDraft[k]={m,d:'from'};prodCloseUnifiedModal();prodRenderRequestForm();
+  };
+  window.prodSaveStaffTime=function(k){
+    const h=Number(document.getElementById('prodStaffStart').value),end=Number(document.getElementById('prodStaffEnd').value);
+    if(end<=h){alert('終了時刻は開始時刻より後にしてください');return}
+    prodStaffDraft[k]={m:'時間',h,end,ts:h,d:'from'};
+    prodCloseUnifiedModal();prodRenderRequestForm();
+  };
+  window.prodSubmitRequest=async function(){
+    const id=document.getElementById('prodStaffName').value;
+    if(!id){document.getElementById('prodSubmitMsg').textContent='名前を選択してください';return}
+    try{
+      await prodApi('submit_request',{staffId:id,monthStart:prodBoot.monthStart,requestData:prodStaffDraft});
+      document.getElementById('prodSubmitMsg').textContent='提出しました';
+    }catch(e){document.getElementById('prodSubmitMsg').textContent='提出できませんでした: '+e.message}
+  };
+  const oldNameChosen=window.prodStaffNameChosen;
+  window.prodStaffNameChosen=function(){
+    prodStaffDraft={};
+    const ok=!!document.getElementById('prodStaffName').value;
+    document.getElementById('prodRequestCalendarStep').classList.toggle('hide',!ok);
+    if(ok)prodRenderRequestForm();
+  };
+
+  // シフト確認：月間 / 日別 / プレビュー
+  window.prodShiftView=function(v){
+    const month=document.getElementById('prodMonthShift'),daily=document.getElementById('prodDailyShift'),preview=document.getElementById('prodPreviewShift');
+    if(month)month.classList.toggle('hide',v!=='month');
+    if(daily)daily.classList.toggle('hide',v!=='daily');
+    if(preview)preview.classList.toggle('hide',v!=='preview');
+    if(v==='daily'){const sel=document.getElementById('prodDailyDate');if(sel&&sel.value)prodRenderDailyShift(sel.value)}
+    if(v==='preview')prodRenderPreview();
+  };
+  window.prodRenderPreview=function(){
+    const p=prodBoot?.published||{},dst=document.getElementById('prodPublishedPreviewTable');
+    if(!dst)return;
+    if(!p.dates||!p.staff){dst.innerHTML='<tr><td>まだシフトは公開されていません</td></tr>';return}
+    const head='<tr><th>氏名</th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${DAYN[d.getDay()]}</th>`}).join('')+'</tr>';
+    const rows=p.staff.map(s=>'<tr><td>'+esc(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id];return '<td>'+(q?esc(q.label??q.start):'／')+'</td>'}).join('')+'</tr>').join('');
+    dst.innerHTML=head+rows;
+  };
+  const priorPublished=window.prodRenderPublished;
+  window.prodRenderPublished=function(){priorPublished();prodRenderPreview()};
+
+  // 月選択肢はすべて1行表記
+  function fixMonthOptions(){
+    document.querySelectorAll('select').forEach(sel=>{
+      if(sel.options.length<12)return;
+      [...sel.options].forEach(o=>{
+        const t=o.textContent.trim(),m=t.match(/^(\d{4})\/(\d{1,2})\/11[〜~](\d{4})\/(\d{1,2})\/10$/);
+        if(m)o.textContent=m[1]===m[3]?`${m[1]}/${m[2]}/11〜${m[4]}/10`:`${m[1]}/${m[2]}/11〜${m[3]}/${m[4]}/10`;
+      });
+    });
+  }
+  setTimeout(fixMonthOptions,0);
+})();
+</script>
