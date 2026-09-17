@@ -229,6 +229,12 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 
 
 .prodOverlay{position:fixed;inset:0;background:#f4f7f8;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px}.prodOverlay.hide{display:none}.prodLoginCard{width:min(440px,94vw);background:#fff;border-radius:22px;padding:28px;box-shadow:0 14px 50px #0002;display:grid;gap:14px}.prodLoginCard input,.prodLoginCard select{font-size:20px;padding:14px;border:1px solid #ccd9dc;border-radius:12px}.prodLoginCard button{width:100%;font-size:17px;padding:14px}.prodMsg{margin-top:8px;font-weight:700}.prodStaff{max-width:1100px;margin:0 auto;padding:18px}.prodStaffHead{display:flex;align-items:center;justify-content:space-between;gap:12px}.prodStaffTabs{display:flex;gap:8px;margin:12px 0}.prodStaffTabs button{flex:1}.prodReqRow{display:grid;grid-template-columns:100px 1fr 1fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #e5ecee}.prodReqRow select,.prodReqRow input{width:100%;padding:9px;border:1px solid #ccd9dc;border-radius:8px}.prodStaff.hide{display:none!important}body.prodStaffMode>header,body.prodStaffMode>main,body.prodStaffMode>nav,body.prodStaffMode>#detailModal,body.prodStaffMode>#preview{display:none!important}@media(max-width:650px){.prodReqRow{grid-template-columns:82px 1fr}.prodReqRow .prodTime{grid-column:2}}
+
+/* production v2.2 staff calendar */
+.prodCal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:12px}.prodCalHead{text-align:center;font-weight:700;padding:7px 0}.prodCalDay{min-height:74px;border:1px solid #d8e4e2;border-radius:10px;background:#fff;padding:6px;display:flex;flex-direction:column;gap:5px}.prodCalDay.out{visibility:hidden}.prodCalDay .dn{font-weight:800;font-size:14px}.prodCalDay select{width:100%;font-size:12px;padding:5px 2px}.prodCalDay input{width:100%;font-size:12px;padding:5px}.prodCalDay.sun .dn{color:#c65a5a}.prodCalDay.sat .dn{color:#536fc1}.prodDailyDate{margin:10px 0;padding:10px;border:1px solid #cfdad8;border-radius:10px;font-size:16px}.prodUnsubmitted{margin-top:10px;padding:10px;border-radius:10px;background:#fff5dc;font-weight:700}
+
+/* production v2.3 admin calendar / holiday / daily staffing adjustment */
+.adminCalWrap{margin-top:12px}.adminCalLegend{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.legendChip,.reqChip{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:11px;font-weight:800}.reqOff{background:#ffe0e5;color:#a52d43}.reqWork{background:#dff3e8;color:#176844}.holidayTag{display:inline-block;background:#ffe3e8;color:#b23850;border-radius:6px;padding:2px 5px;font-size:10px;font-weight:800}.adminCalDay{min-height:118px;cursor:pointer}.adminCalDay .dayTop{display:flex;justify-content:space-between;gap:4px;align-items:flex-start}.adminCalDay .chips{display:flex;flex-wrap:wrap;gap:3px}.adminCalDay .adj{width:58px;font-size:11px;padding:3px}.adminCalDay.holidayLike{background:#fff9fa}.adminCalDay.weekendLike{border-color:#efc5cc}.adminCalDay .holidayName{font-size:9px;color:#b23850;line-height:1.15}.prodStaffPicker{position:fixed;inset:0;background:#0006;z-index:100001;display:flex;align-items:center;justify-content:center;padding:18px}.prodStaffPicker.hide{display:none}.prodStaffPicker .box{background:white;border-radius:18px;padding:18px;width:min(520px,96vw);max-height:82vh;overflow:auto}.pickRow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border-bottom:1px solid #e7eeee;padding:8px 0}.pickRow button{margin:0}.pickSelected{background:#e9f4f2!important}.submittedNote{background:#eef7f5;border-radius:10px;padding:10px;margin:8px 0}.calModeTitle{font-weight:800;margin-top:8px}@media(max-width:650px){.adminCalDay{min-height:100px;padding:4px}.reqChip{font-size:9px;padding:2px 4px}.adminCalDay .adj{width:50px}}
 </style>
 
 <style>
@@ -250,7 +256,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
 <div id="prodLogin" class="prodOverlay"><div class="prodLoginCard"><h1>シフト管理</h1><p>ログイン番号を入力してください</p><input id="prodPin" inputmode="numeric" type="password" placeholder="ログイン番号"><button onclick="prodLogin()">ログイン</button><div id="prodLoginMsg" class="prodMsg"></div></div></div>
 <div id="prodRoleMenu" class="prodOverlay hide"><div class="prodLoginCard"><h2>管理者用</h2><button onclick="prodAdminMode('manual')">希望休を記入してシフトを作る</button><button onclick="prodAdminMode('submitted')">提出された希望休でシフトを作る</button><button class="sec" onclick="prodLogout()">ログアウト</button></div></div>
 <div id="prodStaffMenu" class="prodOverlay hide"><div class="prodLoginCard"><h2>スタッフ用</h2><button onclick="prodStaffChoose('request')">希望休を提出する</button><button onclick="prodStaffChoose('shift')">シフトを確認する</button><button class="sec" onclick="prodLogout()">ログアウト</button></div></div>
-<div id="prodStaffApp" class="prodStaff hide"><div class="prodStaffHead"><h1>スタッフ用シフト</h1><button class="sec" onclick="prodStaffHome()">トップに戻る</button></div><section id="prodStaffRequest" class="card hide"><h2>希望休を提出する</h2><div id="prodRequestNameStep"><label>まず名前を選択</label><select id="prodStaffName" onchange="prodStaffNameChosen()"></select></div><div id="prodRequestCalendarStep" class="hide"><h3>1ヶ月の希望休を選択</h3><div id="prodRequestMonth" class="note"></div><div id="prodRequestGrid"></div><button onclick="prodSubmitRequest()">この内容で提出する</button><div id="prodSubmitMsg" class="prodMsg"></div></div></section><section id="prodStaffShift" class="card hide"><h2>シフトを確認する</h2><div id="prodPublishedAt" class="note"></div><div class="prodStaffTabs"><button onclick="prodShiftView('daily')">その日の出勤時間一覧</button><button onclick="prodShiftView('month')">月の一覧</button></div><div id="prodDailyShift"></div><div id="prodMonthShift" class="tw hide"><table id="prodPublishedTable"></table></div></section></div>
+<div id="prodStaffApp" class="prodStaff hide"><div class="prodStaffHead"><h1>スタッフ用シフト</h1><button class="sec" onclick="prodStaffHome()">トップに戻る</button></div><section id="prodStaffRequest" class="card hide"><h2>希望休を提出する</h2><div id="prodRequestNameStep"><label>まず名前を選択</label><select id="prodStaffName" onchange="prodStaffNameChosen()"></select></div><div id="prodRequestCalendarStep" class="hide"><h3>1ヶ月の希望休を選択</h3><div id="prodRequestMonth" class="note"></div><div id="prodRequestGrid"></div><button onclick="prodSubmitRequest()">この内容で提出する</button><div id="prodSubmitMsg" class="prodMsg"></div></div></section><section id="prodStaffShift" class="card hide"><h2>シフトを確認する</h2><div id="prodPublishedAt" class="note"></div><div class="prodStaffTabs"><button onclick="prodShiftView('month')">月間一覧</button><button onclick="prodShiftView('daily')">日別</button></div><div id="prodMonthShift" class="tw"><table id="prodPublishedTable"></table></div><div id="prodDailyShift" class="hide"><select id="prodDailyDate" class="prodDailyDate" onchange="prodRenderDailyShift(this.value)"></select><div id="prodDailyList"></div></div></section></div>
 <header id="appHeader"><h1>カドクラ シフト管理</h1><div class="sub">本番版</div></header>
 
 <main>
@@ -390,7 +396,7 @@ thead th:first-child{background:#eafafa;z-index:4}.sat{background:#f0fbff!import
   
   <div class="row"><button class="soft" onclick="sampleReq()">サンプル入力</button><button onclick="autoMake(view.input)">自動生成</button><button class="sec" onclick="showPanel('Month')">月間を見る</button></div>
   <p class="note">希望休を入力：×=休み、△=できれば休み、未選択=出勤可能。出勤を入力：○=出勤希望、時間=指定時間で出勤希望。</p>
-  <div class="tw reqwrap"><table id="reqTable"></table></div>
+  <div id="prodAdminReqCalendar"></div><div class="tw reqwrap" style="display:none"><table id="reqTable"></table></div>
 </section>
 
 <section id="pMonth" class="card hide">
@@ -463,7 +469,7 @@ let dates=[],requests={},schedule={},actual={},events={},eventAttend={},view={in
 const H=[9,10,11,12,13,14,15,16,17,18,19], skills=['セッティング','レジ締め','ドリバ','ドリバ締め','仕込み','串打ち','鉄板','新人'];
 const patWeek=[['9',9,13],['9',9,15],['9',9,17],['9',9,18],['11',11,15],['11',11,17],['11',11,18],['11',11,20],['13',13,17],['13',13,20],['13',13,22],['15',15,20],['15',15,22],['17',17,20],['17',17,22],['18',18,22]];
 const patEnd=[['9',9,13],['9',9,15],['9',9,17],['9',9,18],['11',11,15],['11',11,18],['11',11,20],['13',13,18],['13',13,20],['15',15,20],['15',15,23],['17',17,20],['17',17,23],['18',18,23]];
-const ymd=d=>d.toISOString().slice(0,10);
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const wd=d=>'日月火水木金土'[d.getDay()];
 const isWeekend=d=>d.getDay()===0||d.getDay()===6;
 
@@ -8750,6 +8756,136 @@ window.autoMake=function(){return window.v213AutoHall();};window.v62AutoMake=win
 
 
 
+\n<script>
+// ===== production v2.3: 30-year calendar, holiday-like dates, calendar request entry, daily +/- =====
+let prodAdminInputMode='manual';
+let prodDayAdjust=JSON.parse(localStorage.getItem('kadokura_day_adjust_v23')||'{}');
+let prodSubmissionStatus={done:[],missing:[]};
+let prodManualRequestsSnapshot=null;
+function prodPad(n){return String(n).padStart(2,'0')}
+function prodKeyDate(d){return d.getFullYear()+'-'+prodPad(d.getMonth()+1)+'-'+prodPad(d.getDate())}
+function prodNthWeekday(y,m,wd,n){let d=new Date(y,m-1,1),add=(wd-d.getDay()+7)%7;return new Date(y,m-1,1+add+(n-1)*7)}
+function prodEquinox(y,autumn=false){let day=Math.floor((autumn?23.2488:20.8431)+0.242194*(y-1980)-Math.floor((y-1980)/4));return day}
+function prodBaseHolidayName(d){const y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate(),k=prodKeyDate(d);
+  if(m===1&&day===1)return'元日'; if(m===1&&k===prodKeyDate(prodNthWeekday(y,1,1,2)))return'成人の日';
+  if(m===2&&day===11)return'建国記念の日'; if(m===2&&day===23)return'天皇誕生日';
+  if(m===3&&day===prodEquinox(y,false))return'春分の日'; if(m===4&&day===29)return'昭和の日';
+  if(m===5&&day===3)return'憲法記念日'; if(m===5&&day===4)return'みどりの日'; if(m===5&&day===5)return'こどもの日';
+  if(m===7&&k===prodKeyDate(prodNthWeekday(y,7,1,3)))return'海の日'; if(m===8&&day===11)return'山の日';
+  if(m===9&&k===prodKeyDate(prodNthWeekday(y,9,1,3)))return'敬老の日'; if(m===9&&day===prodEquinox(y,true))return'秋分の日';
+  if(m===10&&k===prodKeyDate(prodNthWeekday(y,10,1,2)))return'スポーツの日'; if(m===11&&day===3)return'文化の日'; if(m===11&&day===23)return'勤労感謝の日'; return''}
+function prodHolidayMap(y){let map={};for(let m=1;m<=12;m++)for(let day=1;day<=31;day++){let d=new Date(y,m-1,day);if(d.getMonth()+1!==m)break;let n=prodBaseHolidayName(d);if(n)map[prodKeyDate(d)]=n}
+  // 国民の休日（祝日に挟まれた平日）
+  for(let d=new Date(y,0,2);d<=new Date(y,11,30);d.setDate(d.getDate()+1)){let k=prodKeyDate(d);if(map[k])continue;let a=new Date(d),b=new Date(d);a.setDate(a.getDate()-1);b.setDate(b.getDate()+1);if(map[prodKeyDate(a)]&&map[prodKeyDate(b)])map[k]='国民の休日'}
+  // 振替休日：日曜祝日の直後の非祝日まで繰越
+  Object.keys({...map}).sort().forEach(k=>{let d=new Date(k+'T00:00:00');if(d.getDay()!==0)return;let x=new Date(d);do{x.setDate(x.getDate()+1)}while(map[prodKeyDate(x)]);if(x.getFullYear()===y)map[prodKeyDate(x)]='振替休日'});return map}
+const prodHolidayCache={}; function prodHolidayName(d){let y=d.getFullYear();return (prodHolidayCache[y]??=prodHolidayMap(y))[prodKeyDate(d)]||''}
+function prodSpecialPeriod(d){let m=d.getMonth()+1,day=d.getDate();if((m===12&&day>=29)||(m===1&&day<=3))return'年末年始';if((m===4&&day>=29)||(m===5&&day<=6))return'GW';if(m===9&&day>=19&&day<=25)return'シルバーウィーク';return''}
+function prodHolidayLike(d){return d.getDay()===0||d.getDay()===6||!!prodHolidayName(d)||!!prodSpecialPeriod(d)}
+function prodHolidayLabel(d){return prodHolidayName(d)||prodSpecialPeriod(d)||''}
+function prodPopulateMonths30y(){const sel=document.getElementById('month');if(!sel)return;let cur=sel.value||'2026-09-11',start=new Date('2026-05-11T00:00:00'),end=new Date('2056-12-11T00:00:00'),html='';for(let d=new Date(start);d<=end;d.setMonth(d.getMonth()+1)){let k=prodKeyDate(d),e=new Date(d);e.setMonth(e.getMonth()+1);e.setDate(10);html+=`<option value="${k}">${d.getFullYear()}/${d.getMonth()+1}/11〜${e.getFullYear()}/${e.getMonth()+1}/10</option>`}sel.innerHTML=html;if([...sel.options].some(o=>o.value===cur))sel.value=cur}
+function prodReqDisplay(s,r){if(!r||!r.m)return'';let t=r.m==='時間'?(r.h||r.ts||r.start||''):(r.h||r.ts||'');let mark=s.input==='work'?'出勤':'休み';if(r.m==='△')mark='△';if(r.m==='有給')mark='有給';return `${s.name}${t?' '+t+'〜':''}` }
+function prodReqClass(s,r){return s.input==='work'?'reqWork':'reqOff'}
+function prodRenderAdminCalendar(){const host=document.getElementById('prodAdminReqCalendar');if(!host||!dates.length)return;let first=dates[0],cells=[];for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');for(const d of dates){let k=ymd(d),w=d.getDay(),holiday=prodHolidayLike(d),lab=prodHolidayLabel(d),chips=[];for(const s of staff.filter(x=>x.role==='ホール')){let r=reqObj(s.id,k);if(!r.m)continue;if(prodAdminInputMode==='submitted'||prodAdminInputMode==='manual')chips.push(`<span class="reqChip ${prodReqClass(s,r)}">${prodReqDisplay(s,r)}</span>`)}let adj=Number(prodDayAdjust[k]||0);cells.push(`<div class="prodCalDay adminCalDay ${w===0?'sun ':w===6?'sat ':''}${holiday?'holidayLike weekendLike':''}" onclick="prodOpenDayPicker('${k}')"><div class="dayTop"><div><span class="dn">${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[w]}）</span>${lab?`<div class="holidayName">${lab}</div>`:''}</div><select class="adj" onclick="event.stopPropagation()" onchange="prodSetDayAdjust('${k}',this.value)"><option value="-2" ${adj===-2?'selected':''}>-2</option><option value="-1" ${adj===-1?'selected':''}>-1</option><option value="0" ${adj===0?'selected':''}>0</option><option value="1" ${adj===1?'selected':''}>+1</option><option value="2" ${adj===2?'selected':''}>+2</option></select></div><div class="chips">${chips.join('')}</div></div>`)}let status=prodAdminInputMode==='submitted'?`<div class="submittedNote">提出済み：${prodSubmissionStatus.done.length}人　未提出：${prodSubmissionStatus.missing.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';host.innerHTML=`<div class="calModeTitle">${prodAdminInputMode==='submitted'?'提出された希望休':'希望休を記入'}</div>${status}<div class="adminCalLegend"><span class="legendChip reqOff">休み記入</span><span class="legendChip reqWork">出勤記入</span><span class="note">各日の右上で人数補正 -2〜+2</span></div><div class="prodCal adminCalWrap"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>`}
+function prodSetDayAdjust(k,v){prodDayAdjust[k]=Number(v)||0;localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(prodDayAdjust));quickSave()}
+function prodEnsurePicker(){if(document.getElementById('prodDayPicker'))return;let el=document.createElement('div');el.id='prodDayPicker';el.className='prodStaffPicker hide';el.innerHTML='<div class="box"><div class="mh"><b id="prodPickTitle"></b><button class="sec" onclick="prodCloseDayPicker()">閉じる</button></div><div id="prodPickBody"></div></div>';document.body.appendChild(el)}
+function prodOpenDayPicker(k){if(prodAdminInputMode==='submitted')return;prodEnsurePicker();document.getElementById('prodPickTitle').textContent=k+' の希望入力';let body=document.getElementById('prodPickBody');body.innerHTML=staff.filter(s=>s.role==='ホール').map(s=>{let r=reqObj(s.id,k),on=!!r.m;return `<div class="pickRow"><button class="${on?'pickSelected':''}" onclick="prodToggleReq('${s.id}','${k}')">${s.name}　${s.input==='work'?'【出勤】':'【休み】'}${r.m==='時間'?' '+(r.h||r.ts||'')+'〜':''}</button><button class="sec" onclick="prodSetReqTime('${s.id}','${k}')">時間</button></div>`}).join('');document.getElementById('prodDayPicker').classList.remove('hide')}
+function prodCloseDayPicker(){document.getElementById('prodDayPicker')?.classList.add('hide');prodRenderAdminCalendar()}
+function prodToggleReq(id,k){let s=staff.find(x=>String(x.id)===String(id)),r=reqObj(id,k);if(r.m){r.m='';r.h='';r.ts=''}else r.m=s.input==='work'?'○':'×';quickSave();prodOpenDayPicker(k);prodRenderAdminCalendar()}
+function prodSetReqTime(id,k){let s=staff.find(x=>String(x.id)===String(id)),r=reqObj(id,k),v=prompt(`${s.name} の開始時刻（例：17）`,r.h||r.ts||s.bs||17);if(v===null)return;v=Number(String(v).replace(/[^0-9.]/g,''));if(!Number.isFinite(v))return;r.m='時間';r.h=String(v);r.ts=v;quickSave();prodOpenDayPicker(k);prodRenderAdminCalendar()}
+// renderAll後にもカレンダーを同期
+const prodV23RenderAll=window.renderAll;window.renderAll=function(){let z=prodV23RenderAll.apply(this,arguments);try{prodRenderAdminCalendar()}catch(e){console.error(e)}return z}
+// 管理者モード：手入力/提出済みの双方を同じカレンダーUIへ。提出済みは閲覧専用。
+window.prodAdminMode=async function(mode){document.getElementById('prodRoleMenu').classList.add('hide');if(mode==='submitted'&&prodAdminInputMode!=='submitted')prodManualRequestsSnapshot=JSON.parse(JSON.stringify(requests));if(mode==='manual'&&prodAdminInputMode==='submitted'&&prodManualRequestsSnapshot){requests=JSON.parse(JSON.stringify(prodManualRequestsSnapshot));prodManualRequestsSnapshot=null;}prodAdminInputMode=mode;showPanel('Input');if(mode==='submitted'){try{await prodCloudLoad();const ms=document.getElementById('month').value,j=await prodApi('list_submissions',{monthStart:ms}),subs=j.submissions||[];for(const s of staff)requests[s.id]={};for(const x of subs)requests[x.staff_id]=x.request_data||{};const done=new Set(subs.map(x=>String(x.staff_id)));prodSubmissionStatus.done=subs.map(x=>String(x.staff_id));prodSubmissionStatus.missing=staff.filter(x=>x.role==='ホール'&&!done.has(String(x.id))).map(x=>x.name);quickSave()}catch(e){alert('提出データの読み込みに失敗しました: '+e.message)}}else{prodSubmissionStatus={done:[],missing:[]}}renderAll()}
+// 状態保存に日別人数補正を含める
+const prodV23State=window.prodState;window.prodState=function(){let x=prodV23State();x.dayAdjust=prodDayAdjust;return x}
+const prodV23Apply=window.applyDataObject;window.applyDataObject=function(o){let r=prodV23Apply.apply(this,arguments);if(o?.dayAdjust){prodDayAdjust=o.dayAdjust;localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(prodDayAdjust))}return r}
+// 平日余裕補正は「土日だけ」でなく、祝日/GW/シルバーウィーク/年末年始を除外。
+const prodV23Buffer=window.prodWeekdayBuffer;window.prodWeekdayBuffer=function(){const old=[];for(const d of dates)if(prodHolidayLike(d))old.push([d,d.getDay]);/* 元関数がgetDayだけを見るため休日系を一時的に土曜扱い */for(const [d] of old)d.getDay=()=>6;try{return prodV23Buffer()}finally{for(const [d,fn] of old){delete d.getDay}}}
+function prodTryRemoveOne(d){let k=ymd(d),base=(window.v244Validate?window.v244Validate():[]).length,cands=staff.filter(s=>s.role==='ホール'&&s.employment!=='社員'&&schedule[k]?.[s.id]).sort((a,b)=>({E:0,D:1,C:2,B:3,A:4,S:5}[a.rank]||0)-({E:0,D:1,C:2,B:3,A:4,S:5}[b.rank]||0));for(const s of cands){let old=schedule[k][s.id];if(old.start===9)continue;delete schedule[k][s.id];let now=(window.v244Validate?window.v244Validate():[]).length;if(now<=base)return true;schedule[k][s.id]=old}return false}
+function prodTryAddOne(d){let k=ymd(d),close=closeHour(d),active=h=>staff.filter(s=>s.role==='ホール'&&schedule[k]?.[s.id]&&schedule[k][s.id].start<=h&&schedule[k][s.id].end>h).length,cands=staff.filter(s=>s.role==='ホール'&&s.employment!=='社員'&&!schedule[k]?.[s.id]).sort((a,b)=>({S:5,A:4,B:3,C:2,D:1,E:0}[b.rank]||0)-({S:5,A:4,B:3,C:2,D:1,E:0}[a.rank]||0));for(const s of cands){let r=reqObj(s.id,k);if(r.m==='×'||r.m==='有給'||(s.input==='work'&&!(r.m==='○'||r.m==='時間')))continue;let starts=r.m==='時間'?[Number(r.h||r.ts)]:[13,14,16,17];for(const st of starts){let en=Math.min(close,st+9,Number(s.be||close));if(!Number.isFinite(st)||en-st<4)continue;let cap=prodHolidayLike(d)?7:6,ok=true;for(let h=st;h<en;h++)if(active(h)>=cap){ok=false;break}if(!ok)continue;schedule[k]??={};schedule[k][s.id]={label:String(st),start:st,end:en};return true}}return false}
+function prodApplyDayAdjust(){for(const d of dates){let n=Number(prodDayAdjust[ymd(d)]||0);if(n>0)for(let i=0;i<n;i++)if(!prodTryAddOne(d))break;if(n<0)for(let i=0;i<Math.abs(n);i++)if(!prodTryRemoveOne(d))break}}
+window.prodAutoMake=function(role){const real=window.alert;window.alert=()=>{};try{window.v244AutoHall(role);window.prodWeekdayBuffer();prodApplyDayAdjust()}finally{window.alert=real}quickSave();renderAll();const issues=(window.v244Validate?window.v244Validate():[]);real(issues.length?`ホールの自動生成をしました\
+確認が必要な項目：${issues.length}件`:'ホールの自動生成をしました')};window.autoMake=window.prodAutoMake;window.v62AutoMake=window.prodAutoMake;
+
+const prodV23StaffChoose=window.prodStaffChoose;window.prodStaffChoose=function(t){prodV23StaffChoose(t);if(t==='shift')prodShiftView('month')};
+// 初期化
+prodPopulateMonths30y();makeDates();renderAll();
+</script>\n
+
+<script>
+// ===== production v2.4 final corrections: local calendar keys + staff request semantics =====
+// Always use local calendar date for schedule/request keys. This prevents UTC conversion from moving a date.
+window.ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+function prodSelectedStaff(){
+  const id=document.getElementById('prodStaffName')?.value;
+  return (prodBoot?.staff||[]).find(s=>String(s.id)===String(id));
+}
+
+// Staff request calendar follows the staff setting:
+// off  = only entered dates are days off (blank means available)
+// work = only entered dates are available/work-request dates (blank means unavailable)
+function prodRenderRequestForm(){
+  const ms=prodBoot?.monthStart;
+  const month=document.getElementById('prodRequestMonth');
+  const g=document.getElementById('prodRequestGrid');
+  const st=prodSelectedStaff();
+  if(month) month.textContent=ms?ms.replaceAll('-','/')+'〜翌月10日':'管理者が対象月を設定すると入力できます';
+  if(!g||!ms||!st){if(g)g.innerHTML='';return}
+  const ds=prodMonthDates(ms),first=ds[0],cells=[];
+  for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');
+  const isWork=st.input==='work';
+  for(const d of ds){
+    const k=ymd(d),w=d.getDay(),cl=w===0?' sun':w===6?' sat':'';
+    const options=isWork
+      ? '<option value="">出勤不可</option><option value="○">出勤可能</option><option value="時間">時間指定</option>'
+      : '<option value="">出勤可能</option><option value="×">休み</option><option value="△">できれば休み</option><option value="有給">有給</option>';
+    cells.push(`<div class="prodReqRow prodCalDay${cl}" data-date="${k}"><div class="dn">${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[w]}）</div><select class="prodMode" onchange="prodReqModeChanged(this)">${options}</select><input class="prodHour hide" inputmode="numeric" placeholder="開始時刻"></div>`);
+  }
+  g.innerHTML=`<div class="note" style="margin-bottom:8px">${st.name}：${isWork?'出勤できる日を入力':'休みたい日を入力'}</div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>`;
+}
+
+async function prodSubmitRequest(){
+  const id=document.getElementById('prodStaffName').value;
+  if(!id){document.getElementById('prodSubmitMsg').textContent='名前を選択してください';return}
+  const data={};
+  document.querySelectorAll('#prodRequestGrid .prodReqRow').forEach(r=>{
+    const m=r.querySelector('.prodMode').value;
+    const h=r.querySelector('.prodHour').value.trim();
+    // Do not attach a fake default time to off/blank entries. Time exists only for 時間指定.
+    data[r.dataset.date]=m==='時間'?{m,h:h||'17',ts:Number(h||17),d:'from'}:{m,d:'from'};
+  });
+  try{await prodApi('submit_request',{staffId:id,monthStart:prodBoot.monthStart,requestData:data});document.getElementById('prodSubmitMsg').textContent='提出しました';}
+  catch(e){document.getElementById('prodSubmitMsg').textContent='提出できませんでした: '+e.message}
+}
+
+// Calendar labels: show a time only when the submitted/request record actually specifies a time.
+window.prodReqDisplay=function(s,r){
+  if(!r||!r.m)return'';
+  const t=r.m==='時間'?(r.h||r.ts||r.start||''):'';
+  return `${s.name}${t!==''?' '+t+'〜':''}`;
+};
+
+// Manual calendar picker follows staff input type. A time button is meaningful only for work-input staff.
+window.prodOpenDayPicker=function(k){
+  if(prodAdminInputMode==='submitted')return;
+  prodEnsurePicker();
+  document.getElementById('prodPickTitle').textContent=k+' の希望入力';
+  const body=document.getElementById('prodPickBody');
+  body.innerHTML=staff.filter(s=>s.role==='ホール').map(s=>{
+    const r=reqObj(s.id,k),on=!!r.m,isWork=s.input==='work';
+    const time=r.m==='時間'?' '+(r.h||r.ts||'')+'〜':'';
+    return `<div class="pickRow"><button class="${on?'pickSelected':''}" onclick="prodToggleReq('${s.id}','${k}')">${s.name}　${isWork?'【出勤】':'【休み】'}${time}</button>${isWork?`<button class="sec" onclick="prodSetReqTime('${s.id}','${k}')">時間</button>`:''}</div>`;
+  }).join('');
+  document.getElementById('prodDayPicker').classList.remove('hide');
+};
+
+// Re-render after the final overrides above.
+try{prodRenderAdminCalendar()}catch(e){console.error(e)}
+// ===== /production v2.4 final corrections =====
+</script>
+
 </body>
 </html>
 
@@ -9899,7 +10035,7 @@ function prodSetAdminVisible(on){document.getElementById('prodLogin').classList.
 async function prodLogin(){const pin=document.getElementById('prodPin').value.trim();document.getElementById('prodLoginMsg').textContent='';if(pin==='1'){prodRole='admin';prodPin=pin;prodSetAdminVisible(true);return}if(pin==='10'){prodRole='staff';prodPin=pin;try{prodBoot=await prodApi('staff_bootstrap');prodOpenStaff();}catch(e){document.getElementById('prodLoginMsg').textContent='接続できません: '+e.message}return}document.getElementById('prodLoginMsg').textContent='ログイン番号が違います';}
 function prodLogout(){prodRole=null;prodPin='';document.body.classList.remove('prodStaffMode');document.getElementById('prodStaffApp').classList.add('hide');document.getElementById('prodRoleMenu').classList.add('hide');document.getElementById('prodStaffMenu').classList.add('hide');document.getElementById('prodLogin').classList.remove('hide');document.getElementById('prodPin').value='';}
 function prodShowAdminMenu(){if(prodRole==='admin')prodSetAdminVisible(true)}
-async function prodAdminMode(mode){document.getElementById('prodRoleMenu').classList.add('hide');if(mode==='submitted'){try{await prodCloudLoad();const ms=document.getElementById('month').value;const j=await prodApi('list_submissions',{monthStart:ms});for(const x of j.submissions||[])requests[x.staff_id]=x.request_data||{};quickSave();renderAll();alert(`提出済み希望休を ${(j.submissions||[]).length}人分読み込みました`);}catch(e){alert('提出データの読み込みに失敗しました: '+e.message)}}}
+async function prodAdminMode(mode){document.getElementById('prodRoleMenu').classList.add('hide');if(mode==='submitted'){try{await prodCloudLoad();const ms=document.getElementById('month').value;const j=await prodApi('list_submissions',{monthStart:ms});const subs=j.submissions||[];for(const x of subs)requests[x.staff_id]=x.request_data||{};quickSave();renderAll();const done=new Set(subs.map(x=>String(x.staff_id)));const missing=staff.filter(x=>!done.has(String(x.id))).map(x=>x.name);alert(`提出済み希望休を ${subs.length}人分読み込みました\n\n未提出：${missing.length?missing.join('、'):'なし'}`);}catch(e){alert('提出データの読み込みに失敗しました: '+e.message)}}}
 function prodState(){return {staff,requests,schedule,actual,events,eventAttend,monthStart:document.getElementById('month').value}}
 async function prodCloudSave(){if(prodRole!=='admin')return;try{await prodApi('admin_save',{state:prodState()});alert('クラウドに保存しました');}catch(e){alert('クラウド保存に失敗しました: '+e.message)}}
 async function prodCloudLoad(){if(prodRole!=='admin')return;const j=await prodApi('admin_load');if(j.state&&Object.keys(j.state).length){applyDataObject(j.state);if(j.state.monthStart&&[...document.getElementById('month').options].some(o=>o.value===j.state.monthStart))document.getElementById('month').value=j.state.monthStart;makeDates();renderAll();}}
@@ -9908,28 +10044,44 @@ async function prodCloudSaveSilent(){await prodApi('admin_save',{state:prodState
 function prodOpenStaff(){document.getElementById('prodLogin').classList.add('hide');document.getElementById('prodRoleMenu').classList.add('hide');document.body.classList.add('prodStaffMode');document.getElementById('prodStaffApp').classList.remove('hide');const sel=document.getElementById('prodStaffName');sel.innerHTML='<option value="">名前を選択</option>'+((prodBoot.staff||[]).map(s=>`<option value="${String(s.id).replace(/"/g,'&quot;')}">${s.name}</option>`).join(''));prodStaffTab('request');prodRenderPublished();}
 function prodStaffTab(t){document.getElementById('prodStaffRequest').classList.toggle('hide',t!=='request');document.getElementById('prodStaffShift').classList.toggle('hide',t!=='shift');if(t==='shift')prodRenderPublished();}
 function prodMonthDates(ms){if(!ms)return[];let s=new Date(ms+'T00:00:00'),e=new Date(s);e.setMonth(e.getMonth()+1);e.setDate(10);let a=[];for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1))a.push(new Date(d));return a}
-function prodRenderRequestForm(){const ms=prodBoot?.monthStart;document.getElementById('prodRequestMonth').textContent=ms?ms.replaceAll('-','/')+'〜翌月10日':'管理者が対象月を設定すると入力できます';const g=document.getElementById('prodRequestGrid');if(!ms){g.innerHTML='';return}g.innerHTML=prodMonthDates(ms).map(d=>{const k=d.toISOString().slice(0,10),w='日月火水木金土'[d.getDay()];return `<div class="prodReqRow" data-date="${k}"><b>${d.getMonth()+1}/${d.getDate()}（${w}）</b><select class="prodMode"><option value="">出勤可能</option><option value="×">休み</option><option value="△">できれば休み</option><option value="○">出勤希望</option><option value="時間">時間指定</option><option value="有給">有給</option></select><div class="prodTime"><input class="prodHour" inputmode="numeric" placeholder="開始時刻（時間指定のみ）"></div></div>`}).join('')}
+function prodRenderRequestForm(){const ms=prodBoot?.monthStart;document.getElementById('prodRequestMonth').textContent=ms?ms.replaceAll('-','/')+'〜翌月10日':'管理者が対象月を設定すると入力できます';const g=document.getElementById('prodRequestGrid');if(!ms){g.innerHTML='';return}g.innerHTML=prodMonthDates(ms).map(d=>{const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),w='日月火水木金土'[d.getDay()];return `<div class="prodReqRow" data-date="${k}"><b>${d.getMonth()+1}/${d.getDate()}（${w}）</b><select class="prodMode"><option value="">出勤可能</option><option value="×">休み</option><option value="△">できれば休み</option><option value="○">出勤希望</option><option value="時間">時間指定</option><option value="有給">有給</option></select><div class="prodTime"><input class="prodHour" inputmode="numeric" placeholder="開始時刻（時間指定のみ）"></div></div>`}).join('')}
 async function prodSubmitRequest(){const id=document.getElementById('prodStaffName').value;if(!id){document.getElementById('prodSubmitMsg').textContent='名前を選択してください';return}const data={};document.querySelectorAll('#prodRequestGrid .prodReqRow').forEach(r=>{let m=r.querySelector('.prodMode').value,h=r.querySelector('.prodHour').value.trim();data[r.dataset.date]={m,h:h||'17',d:'from'}});try{await prodApi('submit_request',{staffId:id,monthStart:prodBoot.monthStart,requestData:data});document.getElementById('prodSubmitMsg').textContent='提出しました';}catch(e){document.getElementById('prodSubmitMsg').textContent='提出できませんでした: '+e.message}}
 function prodRenderPublished(){const p=prodBoot?.published||{},tbl=document.getElementById('prodPublishedTable');document.getElementById('prodPublishedAt').textContent=prodBoot?.publishedAt?'公開日時: '+new Date(prodBoot.publishedAt).toLocaleString('ja-JP'):'まだシフトは公開されていません';if(!p.dates||!p.staff){tbl.innerHTML='';return}let head='<tr><th>氏名</th>'+p.dates.map(k=>{let d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${'日月火水木金土'[d.getDay()]}</th>`}).join('')+'</tr>';let rows=p.staff.map(s=>'<tr><td>'+s.name+'</td>'+p.dates.map(k=>{let q=p.schedule?.[k]?.[s.id];return '<td>'+(q?q.label:'／')+'</td>'}).join('')+'</tr>').join('');tbl.innerHTML=head+rows}
 // v244がファイル後半の旧互換スクリプトに上書きされないよう、本番では必ず最終エンジンとして固定。
 function prodWeekdayBuffer(){
-  // 本番調整: 平日は既存配置を壊さず、中番〜遅番に「あと1人いると楽」な日だけ1人残す。土日は一切触らない。
+  // 完成シフト寄せの平日余裕補正。確定済みv244本体は変更せず、生成後にだけ適用する。
+  // 13時以降の「最低限で切り過ぎ」を弱め、同時6人を超えない範囲で最大2人まで残す。
   const cat=s=>staffCategory(s), isEmp=s=>cat(s)==='社員', isFlex=s=>['バイト フリー','バイト 遅番','バイト 学生'].includes(cat(s));
   const req=(s,d)=>requests?.[s.id]?.[ymd(d)]||{}, sh=(s,d)=>schedule?.[ymd(d)]?.[s.id];
   const hard=(s,d)=>['×','有給'].includes(req(s,d).m), requested=(s,d)=>['○','時間'].includes(req(s,d).m);
   const avail=(s,d)=>!hard(s,d)&&!(s.input==='work'&&!requested(s,d));
   const active=(d,h)=>staff.filter(s=>s.role==='ホール'&&sh(s,d)&&Number(sh(s,d).start)<=h&&Number(sh(s,d).end)>h).length;
   const rank=s=>Math.max(0,({S:5,A:4,B:3,C:2,D:1,E:0}[s.rank]??1)-((s.skills||[]).includes('新人')?1:0));
-  for(const d of dates){if([0,6].includes(d.getDay()))continue;
-    const c=closeHour(d), thin=[];for(let h=13;h<Math.min(21,c);h++)if(active(d,h)<=4)thin.push(h);
-    if(thin.length<2)continue; // 既に十分なら増やさない
-    let cand=staff.filter(s=>s.role==='ホール'&&!isEmp(s)&&isFlex(s)&&avail(s,d)&&!sh(s,d));
-    cand.sort((a,b)=>rank(b)-rank(a)||((b.skills||[]).includes('ドリバ')?1:0)-((a.skills||[]).includes('ドリバ')?1:0));
-    for(const s of cand){let r=req(s,d),starts=r.m==='時間'?[Number(r.ts||r.h||s.bs||17)]:[13,14,16,17].filter(x=>x>=Math.min(Number(s.bs||17),17));
-      let placed=false;for(const st of starts){if(!Number.isFinite(st)||st>=c)continue;let en=Math.min(c,st+9,Number(s.be||c));if(en-st<4)continue;
-        // 平日の余裕追加は「最大6人」を超えない範囲だけ。
-        let ok=true;for(let h=st;h<en;h++)if(active(d,h)>=6){ok=false;break;}if(!ok)continue;
-        schedule[ymd(d)]??={};schedule[ymd(d)][s.id]={label:String(st),start:st,end:en};placed=true;break;}if(placed)break;
+  for(const d of dates){
+    if([0,6].includes(d.getDay()))continue;
+    const c=closeHour(d), end=Math.min(21,c);
+    let added=0;
+    while(added<2){
+      // 13〜20時のうち5人未満の時間が2時間以上なら、余裕要員を残す価値あり。
+      const thin=[];for(let h=13;h<end;h++)if(active(d,h)<5)thin.push(h);
+      if(thin.length<2)break;
+      let cand=staff.filter(s=>s.role==='ホール'&&!isEmp(s)&&isFlex(s)&&avail(s,d)&&!sh(s,d));
+      cand.sort((a,b)=>rank(b)-rank(a)||((b.skills||[]).includes('ドリバ')?1:0)-((a.skills||[]).includes('ドリバ')?1:0));
+      let placed=false;
+      for(const s of cand){
+        let r=req(s,d), preferred=Number(r.ts||r.h||s.bs||17);
+        let starts=r.m==='時間'?[preferred]:[13,14,16,17].filter(x=>x>=Math.min(Number(s.bs||17),17));
+        for(const st of starts){
+          if(!Number.isFinite(st)||st>=c)continue;
+          let en=Math.min(c,st+9,Number(s.be||c));if(en-st<4)continue;
+          let useful=0,ok=true;
+          for(let h=st;h<en;h++){if(active(d,h)>=6){ok=false;break}if(h>=13&&h<end&&active(d,h)<5)useful++}
+          if(!ok||useful<2)continue;
+          schedule[ymd(d)]??={};schedule[ymd(d)][s.id]={label:String(st),start:st,end:en};placed=true;added++;break;
+        }
+        if(placed)break;
+      }
+      if(!placed)break;
     }
   }
 }
@@ -9944,10 +10096,13 @@ document.getElementById('prodLogin').classList.remove('hide');
 function prodStaffHome(){document.getElementById('prodStaffApp').classList.add('hide');document.getElementById('prodStaffMenu').classList.remove('hide');}
 function prodStaffChoose(t){document.getElementById('prodStaffMenu').classList.add('hide');document.getElementById('prodStaffApp').classList.remove('hide');prodStaffTab(t);}
 function prodOpenStaff(){document.getElementById('prodLogin').classList.add('hide');document.getElementById('prodRoleMenu').classList.add('hide');document.body.classList.add('prodStaffMode');document.getElementById('prodStaffApp').classList.add('hide');document.getElementById('prodStaffMenu').classList.remove('hide');const sel=document.getElementById('prodStaffName');sel.innerHTML='<option value="">名前を選択</option>'+((prodBoot.staff||[]).map(s=>`<option value="${String(s.id).replace(/"/g,'&quot;')}">${s.name}</option>`).join(''));prodRenderPublished();}
-function prodStaffTab(t){document.getElementById('prodStaffRequest').classList.toggle('hide',t!=='request');document.getElementById('prodStaffShift').classList.toggle('hide',t!=='shift');if(t==='request'){document.getElementById('prodRequestNameStep').classList.remove('hide');document.getElementById('prodRequestCalendarStep').classList.add('hide');document.getElementById('prodStaffName').value='';}if(t==='shift'){prodRenderPublished();prodShiftView('daily');}}
+function prodStaffTab(t){document.getElementById('prodStaffRequest').classList.toggle('hide',t!=='request');document.getElementById('prodStaffShift').classList.toggle('hide',t!=='shift');if(t==='request'){document.getElementById('prodRequestNameStep').classList.remove('hide');document.getElementById('prodRequestCalendarStep').classList.add('hide');document.getElementById('prodStaffName').value='';}if(t==='shift'){prodRenderPublished();prodShiftView('month');}}
 function prodStaffNameChosen(){const ok=!!document.getElementById('prodStaffName').value;document.getElementById('prodRequestCalendarStep').classList.toggle('hide',!ok);if(ok)prodRenderRequestForm();}
-function prodShiftView(v){document.getElementById('prodDailyShift').classList.toggle('hide',v!=='daily');document.getElementById('prodMonthShift').classList.toggle('hide',v!=='month');}
-function prodRenderPublished(){const p=prodBoot?.published||{},tbl=document.getElementById('prodPublishedTable'),daily=document.getElementById('prodDailyShift');document.getElementById('prodPublishedAt').textContent=prodBoot?.publishedAt?'公開日時: '+new Date(prodBoot.publishedAt).toLocaleString('ja-JP'):'まだシフトは公開されていません';if(!p.dates||!p.staff){tbl.innerHTML='';daily.innerHTML='';return}let head='<tr><th>氏名</th>'+p.dates.map(k=>{let d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${'日月火水木金土'[d.getDay()]}</th>`}).join('')+'</tr>';let rows=p.staff.map(s=>'<tr><td>'+s.name+'</td>'+p.dates.map(k=>{let q=p.schedule?.[k]?.[s.id];return '<td>'+(q?q.label:'／')+'</td>'}).join('')+'</tr>').join('');tbl.innerHTML=head+rows;let today=new Date(),tk=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0'),key=p.dates.includes(tk)?tk:p.dates[0];let d=new Date(key+'T00:00:00');let list=p.staff.map(s=>({s,q:p.schedule?.[key]?.[s.id]})).filter(x=>x.q).sort((a,b)=>Number(a.q.start??99)-Number(b.q.start??99));daily.innerHTML=`<h3>${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）</h3>`+(list.length?list.map(x=>`<div class="box" style="margin:8px 0"><b>${x.s.name}</b>　${x.q.label||x.q.start}</div>`).join(''):'出勤者はいません');}
+function prodRenderRequestForm(){const ms=prodBoot?.monthStart;document.getElementById('prodRequestMonth').textContent=ms?ms.replaceAll('-','/')+'〜翌月10日':'管理者が対象月を設定すると入力できます';const g=document.getElementById('prodRequestGrid');if(!ms){g.innerHTML='';return}const ds=prodMonthDates(ms), first=ds[0], last=ds[ds.length-1], cells=[];for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');for(const d of ds){const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),w=d.getDay(),cl=w===0?' sun':w===6?' sat':'';cells.push(`<div class="prodReqRow prodCalDay${cl}" data-date="${k}"><div class="dn">${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[w]}）</div><select class="prodMode" onchange="prodReqModeChanged(this)"><option value="">出勤可能</option><option value="×">休み</option><option value="△">できれば休み</option><option value="○">出勤希望</option><option value="時間">時間指定</option><option value="有給">有給</option></select><input class="prodHour hide" inputmode="numeric" placeholder="開始時刻"></div>`)}g.innerHTML='<div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>'+cells.join('')+'</div>';}
+function prodReqModeChanged(el){const inp=el.closest('.prodReqRow').querySelector('.prodHour');inp.classList.toggle('hide',el.value!=='時間');if(el.value!=='時間')inp.value='';}
+function prodShiftView(v){document.getElementById('prodDailyShift').classList.toggle('hide',v!=='daily');document.getElementById('prodMonthShift').classList.toggle('hide',v!=='month');if(v==='daily'){const sel=document.getElementById('prodDailyDate');if(sel.value)prodRenderDailyShift(sel.value);}}
+function prodRenderDailyShift(key){const p=prodBoot?.published||{},box=document.getElementById('prodDailyList');if(!key||!p.staff){box.innerHTML='';return}let d=new Date(key+'T00:00:00');let list=p.staff.map(s=>({s,q:p.schedule?.[key]?.[s.id]})).filter(x=>x.q).sort((a,b)=>Number(a.q.start??99)-Number(b.q.start??99));box.innerHTML=`<h3>${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）</h3>`+(list.length?list.map(x=>`<div class="box" style="margin:8px 0"><b>${x.s.name}</b>　${x.q.start??x.q.label}時〜</div>`).join(''):'出勤者はいません');}
+function prodRenderPublished(){const p=prodBoot?.published||{},tbl=document.getElementById('prodPublishedTable'),dailySel=document.getElementById('prodDailyDate'),dailyList=document.getElementById('prodDailyList');document.getElementById('prodPublishedAt').textContent=prodBoot?.publishedAt?'公開日時: '+new Date(prodBoot.publishedAt).toLocaleString('ja-JP'):'まだシフトは公開されていません';if(!p.dates||!p.staff){tbl.innerHTML='';dailySel.innerHTML='';dailyList.innerHTML='';return}let head='<tr><th>氏名</th>'+p.dates.map(k=>{let d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${'日月火水木金土'[d.getDay()]}</th>`}).join('')+'</tr>';let rows=p.staff.map(s=>'<tr><td>'+s.name+'</td>'+p.dates.map(k=>{let q=p.schedule?.[k]?.[s.id];return '<td>'+(q?(q.label??q.start):'／')+'</td>'}).join('')+'</tr>').join('');tbl.innerHTML=head+rows;dailySel.innerHTML=p.dates.map(k=>{let d=new Date(k+'T00:00:00');return `<option value="${k}">${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）</option>`}).join('');let today=new Date(),tk=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');dailySel.value=p.dates.includes(tk)?tk:p.dates[0];prodRenderDailyShift(dailySel.value);}
 // 自動生成は確定済みv244を直接保持し、UI変更から切り離す。
 if(typeof window.v244AutoHall==='function'){const PROD_FIXED_V244=window.v244AutoHall;window.autoMake=function(role){const real=window.alert;window.alert=()=>{};try{PROD_FIXED_V244(role||view.input||'ホール');prodWeekdayBuffer();}catch(e){console.error(e);real('自動生成中にエラーが発生しました: '+e.message);return;}finally{window.alert=real;}quickSave();renderAll();const issues=(window.v244Validate?window.v244Validate():[]);real(issues.length?`ホールの自動生成をしました\n確認が必要な項目：${issues.length}件`:'ホールの自動生成をしました');};window.v62AutoMake=window.autoMake;}
 // 保存は端末＋共有保存。画面上では単に「保存」として扱う。
