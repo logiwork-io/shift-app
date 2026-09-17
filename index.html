@@ -9049,6 +9049,97 @@ try{prodRenderAdminCalendar()}catch(e){console.error(e)}
 })();
 </script>
 
+
+
+
+
+<style id="prod-v29-calendar-design">
+/* v29 UI polish — specification only; generation engine untouched */
+:root{--cal-ink:#334645;--cal-line:#e7eeee;--cal-mint:#eef8f6;--cal-mint-2:#f7fbfa;--cal-pink:#fff4f5;--cal-blue:#f3f7ff;--cal-accent:#4fa9a2}
+#prodAdminReqCalendar .prodCalendarTitle,#prodRequestMonth .prodCalendarTitle{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI",sans-serif!important;
+  color:var(--cal-ink)!important;font-size:21px!important;font-weight:800!important;letter-spacing:.035em!important;
+  text-align:center!important;margin:8px 0 13px!important
+}
+#prodAdminReqCalendar .prodCal,#prodRequestGrid .prodCal{
+  overflow:hidden!important;border:1px solid var(--cal-line)!important;border-radius:16px!important;
+  background:#fff!important;box-shadow:0 4px 16px rgba(52,87,84,.06)!important
+}
+#prodAdminReqCalendar .prodCalHead,#prodRequestGrid .prodCalHead{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif!important;
+  background:var(--cal-mint)!important;color:#657a78!important;font-size:12px!important;font-weight:800!important;
+  border-color:var(--cal-line)!important;padding:9px 0!important
+}
+#prodAdminReqCalendar .prodCalHead:first-child,#prodRequestGrid .prodCalHead:first-child{color:#c05a67!important;background:#fff0f2!important}
+#prodAdminReqCalendar .prodCalHead:nth-child(7),#prodRequestGrid .prodCalHead:nth-child(7){color:#567eb2!important;background:#eff5ff!important}
+#prodAdminReqCalendar .prodCalDay,#prodRequestGrid .prodCalDay{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI",sans-serif!important;
+  border-color:var(--cal-line)!important;transition:background .12s ease!important
+}
+#prodAdminReqCalendar .prodCalDay:not(.out):active,#prodRequestGrid .prodCalDay:not(.out):active{background:#eef8f6!important}
+#prodAdminReqCalendar .prodCalDay .dn,#prodRequestGrid .prodCalDay .dn{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:25px!important;height:25px!important;
+  padding:0 3px!important;border-radius:999px!important;font-size:14px!important;font-weight:800!important;color:var(--cal-ink)!important
+}
+#prodAdminReqCalendar .sun .dn,#prodRequestGrid .sun .dn,#prodAdminReqCalendar .holidayLike .dn{color:#bf5261!important;background:#fff0f2!important}
+#prodAdminReqCalendar .sat .dn,#prodRequestGrid .sat .dn{color:#4d77ad!important;background:#edf4ff!important}
+#prodAdminReqCalendar .prodCalDay.sun,#prodRequestGrid .prodCalDay.sun,#prodAdminReqCalendar .prodCalDay.holidayLike{background:#fffafb!important}
+#prodAdminReqCalendar .prodCalDay.sat,#prodRequestGrid .prodCalDay.sat{background:#fafcff!important}
+#prodAdminReqCalendar .holidayName{font-size:9px!important;color:#c05a67!important;line-height:1.15!important;margin:2px 0 3px!important}
+#prodAdminReqCalendar .reqChip{
+  width:auto!important;max-width:100%!important;border-radius:7px!important;padding:3px 5px!important;margin:3px 0 0!important;
+  font-size:10.5px!important;font-weight:700!important;line-height:1.15!important;box-sizing:border-box!important
+}
+#prodAdminReqCalendar .reqChip.reqOff{background:#fff0f2!important;color:#a94454!important}
+#prodAdminReqCalendar .reqChip.reqWork{background:#eaf7f1!important;color:#28715b!important}
+.prodDayAdjBadge{background:#e5f5f2!important;color:#2d7e78!important;border-radius:999px!important;padding:2px 5px!important;margin-left:3px!important;font-size:9px!important}
+#prodRequestGrid .prodReqSummary{display:inline-block!important;max-width:100%!important;margin-top:7px!important;padding:3px 5px!important;border-radius:7px!important;font-size:10.5px!important;font-weight:750!important;line-height:1.1!important;color:#38736c!important;background:#eaf7f4!important;white-space:nowrap!important}
+#prodRequestGrid .prodReqSummary.defaultOff{color:#8a5f65!important;background:#fff0f2!important;opacity:.72!important}
+#prodRequestGrid .prodReqSummary.defaultWork{color:#4f716b!important;background:#eff7f5!important;opacity:.72!important}
+#prodRequestNameStep{padding:10px 11px!important;border-radius:14px!important;background:#f5faf9!important;margin-bottom:10px!important}
+#prodRequestNameStep label{font-size:12px!important;font-weight:750!important;color:#617674!important}
+#prodStaffName,#prodStaffInputMode{border-radius:10px!important;background:#fff!important}
+.prodModalBox{border-radius:22px!important;box-shadow:0 18px 50px rgba(25,55,52,.18)!important}
+.prodModalHead{padding-bottom:10px!important;border-bottom:1px solid #edf2f1!important}.prodModalHead h3{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif!important;font-size:20px!important;color:#344b49!important}
+.prodModalHeadActions{flex-shrink:0!important}.prodModalSave{border-radius:10px!important}.prodModalHeadActions .sec{border-radius:10px!important}
+.prodEventEditor{background:#f7fbfa!important;border-color:#e2eeec!important;border-radius:14px!important}.prodEventTitle{color:#3f6561!important}
+.prodDayEditorRow{border-bottom:1px solid #edf2f1!important}.prodDayEditorRow .nm{border-radius:9px!important}.prodDayEditorRow select{border-radius:9px!important}
+.previewEvent{font-weight:700!important;color:#4a6e69!important}.eventCheck{color:#3b9189!important}
+@media(max-width:430px){
+ #prodAdminReqCalendar .prodCalDay{min-height:116px!important}#prodRequestGrid .prodCalDay{min-height:96px!important}
+ #prodAdminReqCalendar .reqChip,#prodRequestGrid .prodReqSummary{font-size:9.5px!important;padding:3px 4px!important}
+}
+</style>
+<script id="prod-v29-spec-guard">
+(function(){
+  // Staff calendar: changing monthly input mode immediately changes the blank-day interpretation.
+  const oldRender=window.prodRenderRequestForm;
+  window.prodRenderRequestForm=function(){
+    oldRender();
+    const mode=window.prodStaffInputMode||'off';
+    document.querySelectorAll('#prodRequestGrid .prodCalDay:not(.out)').forEach(cell=>{
+      if(cell.querySelector('.prodReqSummary')) return;
+      const x=document.createElement('div');
+      x.className='prodReqSummary '+(mode==='work'?'defaultOff':'defaultWork');
+      x.textContent=mode==='work'?'休み':'出勤可';
+      cell.appendChild(x);
+    });
+  };
+  // Keep only Auto Generate + Preview in the monthly shift action row.
+  function enforceMonthActions(){
+    document.querySelectorAll('.row').forEach(row=>{
+      const buttons=[...row.querySelectorAll(':scope > button')];
+      const auto=buttons.find(b=>b.textContent.trim()==='自動生成');
+      const preview=buttons.find(b=>/プレビュー/.test(b.textContent));
+      if(auto&&preview){
+        buttons.forEach(b=>{if(b!==auto&&b!==preview)b.style.display='none'});
+        preview.textContent='プレビュー';
+      }
+    });
+  }
+  enforceMonthActions();setTimeout(enforceMonthActions,0);
+})();
+</script>
 </body>
 </html>
 
@@ -10562,5 +10653,66 @@ body.prodStaffMode #prodRequestGrid{width:calc(100vw - 8px)!important;max-width:
  window.prodAdminMode=async function(mode){document.getElementById('prodRoleMenu').classList.add('hide');window.prodAdminInputMode=mode;if(mode==='submitted'){try{await prodCloudLoad();const ms=document.getElementById('month').value,j=await prodApi('list_submissions',{monthStart:ms}),subs=j.submissions||[];for(const x of subs){const data=clone(x.request_data||{}),meta=data.__meta||{};delete data.__meta;requests[x.staff_id]=data;const s=staffById(x.staff_id);if(s&&meta.inputMode)s.input=meta.inputMode}quickSave();renderAll();const done=new Set(subs.map(x=>String(x.staff_id)));prodSubmissionStatus={done:staff.filter(x=>done.has(String(x.id))).map(x=>x.name),missing:staff.filter(x=>!done.has(String(x.id))).map(x=>x.name)};prodRenderAdminCalendar();alert(`提出済み希望休を ${subs.length}人分読み込みました\n\n未提出：${prodSubmissionStatus.missing.length?prodSubmissionStatus.missing.join('、'):'なし'}`)}catch(e){alert('提出データの読み込みに失敗しました: '+e.message)}}else{renderAll();prodRenderAdminCalendar()}};
  // プレビューは公開シフト全体を横スクロール表示
  window.prodRenderPreview=function(){const p=prodBoot?.published||{},dst=document.getElementById('prodPublishedPreviewTable');if(!dst)return;if(!p.dates||!p.staff){dst.innerHTML='<tr><td>まだシフトは公開されていません</td></tr>';return}const head='<tr><th>氏名</th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${DAYN[d.getDay()]}</th>`}).join('')+'</tr>';const rows=p.staff.map(s=>'<tr><td>'+esc2(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id];return '<td>'+(q?esc2(q.label??q.start):'／')+'</td>'}).join('')+'</tr>').join('');dst.innerHTML=head+rows};
+})();
+</script>
+<style id="prod-v28-style">
+/* v28 final specification UI */
+#prodAdminReqCalendar .calModeTitle,#prodAdminReqCalendar .adminCalLegend{display:none!important}
+#prodAdminReqCalendar .prodCal,#prodRequestGrid .prodCal{gap:0!important;border-top:1px solid #dfe8e8;border-left:1px solid #dfe8e8;background:#fff}
+#prodAdminReqCalendar .prodCalHead,#prodRequestGrid .prodCalHead{border-right:1px solid #dfe8e8;border-bottom:1px solid #dfe8e8;padding:8px 1px!important;background:#f8fbfb;font-size:12px!important;font-weight:700!important;letter-spacing:.02em}
+#prodAdminReqCalendar .prodCalDay,#prodRequestGrid .prodCalDay{border-radius:0!important;border:0!important;border-right:1px solid #dfe8e8!important;border-bottom:1px solid #dfe8e8!important;box-shadow:none!important;background:#fff;padding:6px 4px!important}
+#prodAdminReqCalendar .prodCalDay{min-height:112px!important}#prodRequestGrid .prodCalDay{min-height:92px!important}
+#prodAdminReqCalendar .prodCalDay.sun,#prodRequestGrid .prodCalDay.sun{background:#fff8f8!important}#prodAdminReqCalendar .prodCalDay.sat,#prodRequestGrid .prodCalDay.sat{background:#f7faff!important}
+#prodAdminReqCalendar .prodCalDay.holidayLike{background:#fff8f8!important}
+#prodAdminReqCalendar .prodCalDay .dn,#prodRequestGrid .prodCalDay .dn{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif;font-size:15px!important;font-weight:700!important;letter-spacing:0;color:#263536}
+#prodAdminReqCalendar .sun .dn,#prodRequestGrid .sun .dn,#prodAdminReqCalendar .holidayLike .dn{color:#c44c5c!important}#prodAdminReqCalendar .sat .dn,#prodRequestGrid .sat .dn{color:#4679ba!important}
+.prodCalendarTitle{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif!important;font-size:20px!important;font-weight:700!important;letter-spacing:.02em!important;margin:2px 0 10px!important}
+#prodAdminReqCalendar .reqChip{display:block!important;width:max-content;max-width:100%;margin:3px 0 0!important;padding:2px 4px!important;border-radius:5px!important;font-size:10px!important;font-weight:650!important;white-space:normal!important;line-height:1.2!important}
+#prodRequestGrid .prodReqSummary{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif!important;font-size:11px!important;font-weight:650!important;line-height:1.25!important;margin-top:8px!important;word-break:keep-all!important;overflow-wrap:normal!important}
+.prodModalHead{align-items:center!important}.prodModalHeadActions{display:flex;gap:7px;margin-left:auto}.prodModalHeadActions button{margin:0!important;padding:9px 13px!important;white-space:nowrap}.prodModalSave{background:#43aaa5!important;color:#fff!important}
+.prodDayEditorRow{grid-template-columns:minmax(72px,1fr) 58px minmax(68px,82px) 12px minmax(68px,82px)!important}.prodDayEditorRow .nm,.prodDayEditorRow .state{text-align:left!important}
+.prodEventEditor{margin:12px 0 4px;padding:12px;border:1px solid #dce8e8;border-radius:12px;background:#fafcfc}.prodEventTitle{font-weight:800;margin-bottom:8px}.prodEventLine{display:grid;grid-template-columns:minmax(100px,1fr) 86px auto;gap:7px;align-items:center}.prodEventLine input,.prodEventLine select{width:100%!important;margin:0!important}.prodEventParticipants{margin-top:9px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.prodEventParticipants label{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;background:#fff;border:1px solid #e0e8e8;font-size:13px}.prodEventParticipants input{width:auto!important;margin:0!important}
+.previewEvent{font-size:10px!important;line-height:1.2!important;white-space:normal!important;min-width:58px}.eventCheck{font-weight:900;margin-left:3px}
+@media(max-width:430px){.prodDayEditorRow{grid-template-columns:minmax(58px,1fr) 50px 65px 10px 65px!important}.prodEventLine{grid-template-columns:minmax(90px,1fr) 78px auto}.prodEventParticipants{grid-template-columns:1fr 1fr}}
+</style>
+<script id="prod-v28-final-spec">
+(function(){
+ const WD='日月火水木金土';
+ const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const cp=o=>JSON.parse(JSON.stringify(o??{}));
+ const hall=()=>staff.filter(s=>s.role==='ホール');
+ const emp=s=>s&&s.employment==='社員';
+ const opts=v=>'<option value="">--</option>'+Array.from({length:16},(_,i)=>i+9).map(h=>`<option value="${h}" ${String(v)===String(h)?'selected':''}>${h}時</option>`).join('');
+ const dl=(d,sm)=>(d.getDate()===1&&d.getMonth()!==sm)?`${d.getMonth()+1}/1`:String(d.getDate());
+ function modal(){return document.getElementById('prodUnifiedModal')}
+ function headAdmin(on){const h=modal()?.querySelector('.prodModalHead');if(!h)return;let old=h.querySelector('.prodModalClose');if(old)old.remove();let a=h.querySelector('.prodModalHeadActions');if(a)a.remove();if(on){a=document.createElement('div');a.className='prodModalHeadActions';a.innerHTML='<button class="prodModalSave" onclick="prodSaveAdminDay()">保存</button><button class="sec" onclick="prodCloseAdminDraft()">閉じる</button>';h.appendChild(a)}else{const b=document.createElement('button');b.className='sec prodModalClose';b.textContent='閉じる';b.onclick=()=>prodCloseUnifiedModal();h.appendChild(b)}}
+ window.prodCloseAdminDraft=function(){window.adminDraftV28=null;modal()?.classList.add('hide');headAdmin(false)};
+ // admin calendar: only month title + weekday grid; no permanent adjustment dropdown/legend/mode title
+ window.prodRenderAdminCalendar=function(){const host=document.getElementById('prodAdminReqCalendar');if(!host||!window.dates?.length)return;const first=dates[0],sm=first.getMonth(),cells=[];for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');for(const d of dates){const k=ymd(d),w=d.getDay(),holiday=typeof prodHolidayLike==='function'&&prodHolidayLike(d),lab=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'',chips=[];for(const s of hall()){const r=reqObj(s.id,k);if(!r?.m)continue;let a=r.ts??(r.d==='from'?r.h:'')??'',b=r.te??r.end??(r.d==='until'?r.h:'')??'',tm=a&&b?`${a}〜${b}`:a?`${a}〜`:b?`〜${b}`:'';chips.push(`<span class="reqChip ${s.input==='work'?'reqWork':'reqOff'}">${E(s.name)}${tm?' '+E(tm):''}</span>`)}const adj=Number((window.prodDayAdjust||{})[k]||0);cells.push(`<div class="prodCalDay adminCalDay ${w===0?'sun ':w===6?'sat ':''}${holiday?'holidayLike ':''}" onclick="prodOpenDayEditor('${k}')"><div class="dayTop"><span class="dn">${dl(d,sm)}${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</span></div>${lab?`<div class="holidayName">${E(lab)}</div>`:''}<div class="chips">${chips.join('')}</div></div>`)}const status=window.prodAdminInputMode==='submitted'?`<div class="submittedNote" style="margin-top:10px">提出済み：${(prodSubmissionStatus.done||[]).length}人　未提出：${(prodSubmissionStatus.missing||[]).length?(prodSubmissionStatus.missing||[]).join('、'):'なし'}</div>`:'';host.innerHTML=`<div class="prodCalendarTitle">${first.getFullYear()}年${first.getMonth()+1}月</div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>${status}`};
+ function evFor(k){const x=events?.[k];if(x&&typeof x==='object')return {name:String(x.name??x.memo??''),start:String(x.start??'')};return {name:typeof x==='string'?x:'',start:''}}
+ window.prodOpenDayEditor=function(k){if(window.prodAdminInputMode==='submitted'){headAdmin(false);return typeof prodOpenDayPicker==='function'?prodOpenDayPicker(k):null}const d=new Date(k+'T00:00:00'),ev=evFor(k);window.adminDraftV28={k,adj:Number((window.prodDayAdjust||{})[k]||0),rows:{},event:ev,attend:{...(eventAttend?.[k]||{})}};for(const s of hall())adminDraftV28.rows[s.id]=cp(reqObj(s.id,k));document.getElementById('prodUnifiedTitle').textContent=`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;renderEditor();headAdmin(true);modal().classList.remove('hide')};
+ function renderEditor(){const D=window.adminDraftV28,k=D.k;const eventPeople=hall().filter(emp).map(s=>`<label><input type="checkbox" ${D.attend[s.id]?'checked':''} onchange="adminDraftV28.attend['${s.id}']=this.checked">${E(s.name)}</label>`).join('');const rows=hall().map(s=>{const r=D.rows[s.id]||{},on=!!r.m,a=r.ts??(r.d==='from'?r.h:'')??'',b=r.te??r.end??(r.d==='until'?r.h:'')??'',state=r.m==='時間'?'出勤':on?(s.input==='work'?'出勤':'休み'):'未登録';return `<div class="prodDayEditorRow ${s.input==='work'?'workType':'offType'}"><button class="nm sec" onclick="prodAdminDraftToggle28('${s.id}')">${E(s.name)}</button><div class="state">${state}</div><select onchange="prodAdminDraftTime28('${s.id}','ts',this.value)">${opts(a)}</select><span>〜</span><select onchange="prodAdminDraftTime28('${s.id}','te',this.value)">${opts(b)}</select></div>`}).join('');document.getElementById('prodUnifiedBody').innerHTML=`<div class="prodAdjLine"><b>人数補正</b><select onchange="adminDraftV28.adj=Number(this.value)">${[-2,-1,0,1,2].map(v=>`<option value="${v}" ${v===D.adj?'selected':''}>${v>0?'+':''}${v}</option>`).join('')}</select></div><div class="prodEventEditor"><div class="prodEventTitle">イベント</div><div class="prodEventLine"><input value="${E(D.event.name)}" placeholder="イベント名" oninput="adminDraftV28.event.name=this.value"><select onchange="adminDraftV28.event.start=this.value">${opts(D.event.start)}</select><button class="sec" type="button" onclick="this.closest('.prodEventEditor').querySelector('.prodEventParticipants').classList.toggle('hide')">参加者</button></div><div class="prodEventParticipants hide">${eventPeople||'<span class="note">社員が登録されていません</span>'}</div></div><div class="prodDayEditorRows">${rows}</div>`}
+ window.prodAdminDraftToggle28=function(id){const D=adminDraftV28,s=staff.find(x=>String(x.id)===String(id)),r=D.rows[id]||{};D.rows[id]=r.m?{m:'',ts:'',te:''}:{m:s?.input==='work'?'○':'×',ts:'',te:''};renderEditor()};
+ window.prodAdminDraftTime28=function(id,key,v){const D=adminDraftV28,r=D.rows[id]||(D.rows[id]={m:'',ts:'',te:''});r[key]=v;if(r.ts||r.te)r.m='時間';else if(r.m==='時間')r.m='';renderEditor()};
+ window.prodSaveAdminDay=async function(){const D=adminDraftV28;if(!D)return;const k=D.k;for(const s of hall()){requests[s.id]??={};requests[s.id][k]=cp(D.rows[s.id]||{m:'',ts:'',te:''})}window.prodDayAdjust=window.prodDayAdjust||{};prodDayAdjust[k]=D.adj;window.prodDayAdjust[k]=D.adj;localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(window.prodDayAdjust));events[k]={...(events[k]&&typeof events[k]==='object'?events[k]:{}),name:D.event.name,memo:D.event.name,start:D.event.start,end:''};eventAttend[k]={};for(const s of hall().filter(emp))if(D.attend[s.id])eventAttend[k][s.id]=true;quickSave();try{if(typeof prodCloudSaveSilent==='function')await prodCloudSaveSilent()}catch(e){console.warn(e)}window.adminDraftV28=null;modal().classList.add('hide');headAdmin(false);prodRenderAdminCalendar()};
+ // staff request mode + compact calendar labels; paid leave only for employee/off-input mode
+ function selected(){const id=document.getElementById('prodStaffName')?.value;return (prodBoot?.staff||[]).find(s=>String(s.id)===String(id))}
+ function modeSel(){let x=document.getElementById('prodStaffInputMode');if(x)return x;const n=document.getElementById('prodStaffName');x=document.createElement('select');x.id='prodStaffInputMode';x.innerHTML='<option value="off">休み希望を入力</option><option value="work">出勤希望を入力</option>';x.onchange=()=>{window.prodStaffInputMode=x.value;prodRenderRequestForm()};n.insertAdjacentElement('afterend',x);return x}
+ window.prodStaffNameChosen=function(){const ok=!!document.getElementById('prodStaffName').value;document.getElementById('prodRequestCalendarStep').classList.toggle('hide',!ok);if(ok){const s=selected();window.prodStaffInputMode=s?.input==='work'?'work':'off';modeSel().value=window.prodStaffInputMode;window.prodStaffDraft={};prodRenderRequestForm()}};
+ function short(r){if(!r?.m)return'';if(r.m==='○')return'出勤';if(r.m==='×')return'休み';if(r.m==='△')return'でき休';if(r.m==='有給')return'有給';if(r.m==='時間'){let a=r.ts??r.h??'',b=r.te??r.end??'';return a&&b?`${a}〜${b}`:a?`${a}〜`:b?`〜${b}`:'時間'}return r.m}
+ window.prodRenderRequestForm=function(){const ms=prodBoot?.monthStart,m=document.getElementById('prodRequestMonth'),g=document.getElementById('prodRequestGrid');if(!ms){m.textContent='管理者が対象月を設定すると入力できます';g.innerHTML='';return}modeSel().value=window.prodStaffInputMode||'off';const ds=prodMonthDates(ms),first=ds[0],sm=first.getMonth(),cells=[];m.innerHTML=`<div class="prodCalendarTitle">${first.getFullYear()}年${first.getMonth()+1}月</div>`;for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');for(const d of ds){const k=ymd(d),w=d.getDay(),r=prodStaffDraft[k]||{},t=short(r);cells.push(`<div class="prodReqRow prodCalDay ${w===0?'sun ':w===6?'sat ':''}" onclick="prodOpenStaffDay('${k}')"><div class="dn">${dl(d,sm)}</div>${t?`<div class="prodReqSummary">${E(t)}</div>`:''}</div>`)}g.innerHTML=`<div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>`};
+ window.prodOpenStaffDay=function(k){headAdmin(false);const d=new Date(k+'T00:00:00'),cur=prodStaffDraft[k]||{},mode=window.prodStaffInputMode||'off',isEmp=selected()?.employment==='社員';document.getElementById('prodUnifiedTitle').textContent=`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;let choices=mode==='work'?[['○','出勤希望'],['△','できれば休み'],['時間','時間指定']]:[['×','休み希望'],['△','できれば休み'],['時間','時間指定']];if(isEmp&&mode==='off')choices.push(['有給','有給']);document.getElementById('prodUnifiedBody').innerHTML=`<div class="prodStaffChoice">${choices.map(([v,l])=>`<button class="${cur.m===v?'selected':''}" onclick="prodChooseStaffReq('${k}','${v}')">${l}</button>`).join('')}<button class="sec" onclick="prodChooseStaffReq('${k}','')">入力を消す</button></div><div id="prodStaffTimeBox" class="${cur.m==='時間'?'':'hide'}"><div class="prodTimeEditor"><select id="prodStaffStart">${opts(cur.ts??cur.h??'')}</select><span>〜</span><select id="prodStaffEnd">${opts(cur.te??cur.end??'')}</select></div><button style="margin-top:10px" onclick="prodSaveStaffTime('${k}')">この時間で決定</button></div>`;modal().classList.remove('hide')};
+ // published data carries event information; staff preview mirrors admin preview layout
+ window.prodPublish=async function(){if(prodRole!=='admin')return;if(!confirm('現在の完成シフトをスタッフへ公開しますか？'))return;try{const pub={monthStart:document.getElementById('month').value,staff:staff.map(s=>({id:s.id,name:s.name,role:s.role,employment:s.employment})),schedule,dates:dates.map(d=>ymd(d)),events:cp(events),eventAttend:cp(eventAttend)};await prodApi('publish',{published:pub});await prodCloudSaveSilent();alert('完成シフトを公開しました')}catch(e){alert('公開に失敗しました: '+e.message)}};
+ function pubEvent(p,k){const x=p.events?.[k];if(!x)return'';const name=typeof x==='object'?(x.name??x.memo??''):x,start=typeof x==='object'?(x.start??''):'';return [name,start!==''?`${start}時`:''].filter(Boolean).join(' ')}
+ function labelFor(p,k,s,q){if(!q)return'／';const base=E(q.label??q.start);return base+(p.eventAttend?.[k]?.[s.id]?'<span class="eventCheck">✓</span>':'')}
+ function fullPreviewHTML(p){if(!p?.dates||!p?.staff)return'<tr><td>まだシフトは公開されていません</td></tr>';const ev='<tr><th></th>'+p.dates.map(k=>`<th><div class="previewEvent">${E(pubEvent(p,k))}</div></th>`).join('')+'</tr>',head='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${WD[d.getDay()]}</th>`}).join('')+'</tr>';let rows='',prev=null;for(const s of p.staff.filter(x=>x.role==='ホール')){const live=(prodBoot?.staff||[]).find(x=>String(x.id)===String(s.id)),g=s.employment||live?.employment||'';if(prev!==null&&g&&g!==prev)rows+=`<tr class="groupGap"><td colspan="${p.dates.length+1}"></td></tr>`;rows+='<tr><td>'+E(s.name)+'</td>'+p.dates.map(k=>`<td>${labelFor(p,k,s,p.schedule?.[k]?.[s.id])}</td>`).join('')+'</tr>';if(g)prev=g}return ev+head+rows}
+ window.prodRenderPreview=function(){const dst=document.getElementById('prodPublishedPreviewTable');if(dst)dst.innerHTML=fullPreviewHTML(prodBoot?.published||{})};
+ const oldShiftView=window.prodShiftView;window.prodShiftView=function(v){const month=document.getElementById('prodMonthShift'),daily=document.getElementById('prodDailyShift'),preview=document.getElementById('prodPreviewShift');if(month)month.classList.toggle('hide',v!=='month');if(daily)daily.classList.toggle('hide',v!=='daily');if(preview)preview.classList.toggle('hide',v!=='preview');if(v==='daily'){const s=document.getElementById('prodDailyDate');if(s?.value)prodRenderDailyShift(s.value)}if(v==='preview')prodRenderPreview()};
+ // admin preview: existing blank event row is used; event participants get check beside start time
+ window.renderPreview=function(){const title=month.selectedOptions[0].textContent,list=hall();const evrow='<tr><th></th>'+dates.map(d=>{const k=ymd(d),x=evFor(k),txt=[x.name,x.start!==''?x.start+'時':''].filter(Boolean).join(' ');return `<th><div class="previewEvent">${E(txt)}</div></th>`}).join('')+'</tr>';const head='<tr><th></th>'+dates.map(d=>`<th>${d.getDate()}<br>${WD[d.getDay()]}</th>`).join('')+'</tr>';let rows='',prev=null;for(const s of list){const g=typeof staffCategory==='function'?staffCategory(s):(s.employment||'');if(prev!==null&&g!==prev)rows+=`<tr class="groupGap"><td colspan="${dates.length+1}"></td></tr>`;rows+='<tr><td>'+E(s.name)+'</td>'+dates.map(d=>{const k=ymd(d),p=schedule[k]?.[s.id],mark=p&&eventAttend?.[k]?.[s.id]?'<span class="eventCheck">✓</span>':'';return `<td>${p?E(p.label)+mark:'／'}</td>`}).join('')+'</tr>';prev=g}sheet.innerHTML=`<div class="miniTitle">${E(title)} ホールシフト</div><table class="pt">${evrow}${head}${rows}</table>`};
+ // 月間シフト操作は「自動生成」「プレビュー」の2つだけ
+ function trimMonthButtons(){document.querySelectorAll('.panel,.card,section').forEach(box=>{const bs=[...box.querySelectorAll(':scope > .row > button')];if(bs.some(b=>b.textContent.trim()==='自動生成')&&bs.some(b=>/プレビュー/.test(b.textContent))){bs.forEach(b=>{const t=b.textContent.trim();if(t!=='自動生成'&&!/プレビュー/.test(t))b.style.display='none';if(/プレビュー/.test(t))b.textContent='プレビュー'})}})}
+ trimMonthButtons();setTimeout(trimMonthButtons,0);
 })();
 </script>
