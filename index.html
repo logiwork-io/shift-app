@@ -9179,6 +9179,8 @@ try{prodRenderAdminCalendar()}catch(e){console.error(e)}
  };
 })();
 </script>
+
+
 </body>
 </html>
 
@@ -10988,3 +10990,62 @@ body.prodStaffMode #prodRequestGrid{width:calc(100vw - 8px)!important;max-width:
 </script>
 <!-- ===== /v236 FINAL requested behavior ===== -->
 
+<!-- ===== v237 UI STABILITY FIXES ===== -->
+<style id="v237-ui-stability">
+/* UI only. Generation engine is intentionally untouched. */
+#prodRequestGrid .prodReqRow{pointer-events:auto!important;cursor:pointer!important;touch-action:manipulation!important;position:relative!important;z-index:2!important}
+#prodRequestGrid .prodReqRow *{pointer-events:none!important}
+.prodStaffPreview .prodPreviewScroll{overflow:visible!important;width:100%!important;height:auto!important}
+.prodStaffPreview #prodPublishedPreviewTable{transform:none!important;width:100%!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;margin:0!important}
+.prodStaffPreview #prodPublishedPreviewTable th,.prodStaffPreview #prodPublishedPreviewTable td{padding:2px 0!important;font-size:6px!important;line-height:1.08!important;white-space:normal!important;overflow:hidden!important;text-align:center!important;vertical-align:middle!important}
+.prodStaffPreview #prodPublishedPreviewTable th:first-child,.prodStaffPreview #prodPublishedPreviewTable td:first-child{width:44px!important;font-size:7px!important;font-weight:700!important;white-space:nowrap!important}
+.prodStaffPreview #prodPublishedPreviewTable .previewEvent{font-size:5px!important;line-height:1.05!important;max-height:22px!important;overflow:hidden!important;word-break:break-all!important}
+.prodStaffPreview .eventCheck{font-size:6px!important;margin-left:1px!important}
+@media(min-width:600px){.prodStaffPreview #prodPublishedPreviewTable th,.prodStaffPreview #prodPublishedPreviewTable td{font-size:8px!important}.prodStaffPreview #prodPublishedPreviewTable th:first-child,.prodStaffPreview #prodPublishedPreviewTable td:first-child{width:70px!important;font-size:9px!important}.prodStaffPreview #prodPublishedPreviewTable .previewEvent{font-size:7px!important}}
+</style>
+<script id="v237-ui-stability">
+(()=>{
+  // Staff request calendar: use delegated pointer handling so later redraws cannot leave dead cells.
+  function ensureStaffModal237(){
+    let m=document.getElementById('prodUnifiedModal');
+    if(m)return m;
+    m=document.createElement('div');m.id='prodUnifiedModal';m.className='prodModal hide';
+    m.innerHTML='<div class="prodModalBox"><div class="prodModalHead"><h3 id="prodUnifiedTitle"></h3><button class="sec prodModalClose" onclick="prodCloseUnifiedModal()">閉じる</button></div><div id="prodUnifiedBody"></div></div>';
+    document.body.appendChild(m);return m;
+  }
+  const openStaff237=window.prodOpenStaffDay;
+  window.prodOpenStaffDay=function(k){ensureStaffModal237();return openStaff237?openStaff237(k):undefined};
+  function bindRequestGrid237(){
+    const g=document.getElementById('prodRequestGrid');if(!g||g.dataset.v237Bound==='1')return;
+    g.dataset.v237Bound='1';
+    g.addEventListener('click',e=>{const c=e.target.closest('.prodReqRow[data-date]');if(!c||!g.contains(c))return;e.preventDefault();e.stopPropagation();window.prodOpenStaffDay(c.dataset.date)},true);
+    g.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const c=e.target.closest('.prodReqRow[data-date]');if(!c)return;e.preventDefault();window.prodOpenStaffDay(c.dataset.date)},true);
+  }
+  const renderReq237=window.prodRenderRequestForm;
+  window.prodRenderRequestForm=function(){const r=renderReq237?renderReq237():undefined;bindRequestGrid237();document.querySelectorAll('#prodRequestGrid .prodReqRow[data-date]').forEach(c=>{c.removeAttribute('onclick');c.setAttribute('role','button');c.tabIndex=0});return r};
+  const nameChosen237=window.prodStaffNameChosen;
+  window.prodStaffNameChosen=function(){const r=nameChosen237?nameChosen237():undefined;bindRequestGrid237();return r};
+
+  // Staff preview: same monthly content, fitted by table layout rather than transform scaling.
+  const esc237=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+  const eventText237=(p,k)=>{const x=p?.events?.[k];if(!x)return'';const name=typeof x==='object'?(x.name??x.memo??''):x;const start=typeof x==='object'?(x.start??x.time??''):'';return [name,start!==''&&start!=null?String(start)+'時':''].filter(Boolean).join(' ')};
+  window.prodRenderPreview=function(){
+    const p=prodBoot?.published||{},t=document.getElementById('prodPublishedPreviewTable'),wrap=document.querySelector('.prodStaffPreview .prodPreviewScroll');if(!t)return;
+    if(!p.dates||!p.staff){t.innerHTML='<tr><td>まだシフトは公開されていません</td></tr>';return}
+    const people=p.staff.filter(s=>!s.role||s.role==='ホール');
+    const ev='<tr><th></th>'+p.dates.map(k=>`<th><div class=\"previewEvent\">${esc237(eventText237(p,k))}</div></th>`).join('')+'</tr>';
+    const hd='<tr><th>氏名</th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${'日月火水木金土'[d.getDay()]}</th>`}).join('')+'</tr>';
+    const rows=people.map(s=>'<tr><td>'+esc237(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id],ck=q&&p.eventAttend?.[k]?.[s.id]?' <span class=\"eventCheck\">✓</span>':'';return '<td>'+(q?esc237(q.label??q.start)+ck:'／')+'</td>'}).join('')+'</tr>').join('');
+    t.innerHTML=ev+hd+rows;if(wrap){wrap.style.height='auto';wrap.style.overflow='visible'}t.style.transform='none';t.style.width='100%';t.style.maxWidth='100%';t.style.tableLayout='fixed';
+    const root=document.getElementById('prodPreviewShift');if(root)[...root.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim()==='\\n').forEach(n=>n.remove());
+  };
+  window.prodShiftView=function(v){
+    const month=document.getElementById('prodMonthShift'),daily=document.getElementById('prodDailyShift'),preview=document.getElementById('prodPreviewShift');
+    if(month)month.classList.toggle('hide',v!=='month');if(daily)daily.classList.toggle('hide',v!=='daily');if(preview)preview.classList.toggle('hide',v!=='preview');
+    if(v==='daily'){const sel=document.getElementById('prodDailyDate');if(sel?.value&&typeof prodRenderDailyShift==='function')prodRenderDailyShift(sel.value)}
+    if(v==='preview')window.prodRenderPreview();
+  };
+  bindRequestGrid237();
+})();
+</script>
+<!-- ===== /v237 UI STABILITY FIXES ===== -->
