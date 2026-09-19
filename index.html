@@ -9244,7 +9244,118 @@ try{prodRenderAdminCalendar()}catch(e){console.error(e)}
 })();
 </script>
 <!-- ===== /v238 UI CONSOLIDATION ===== -->
-</body>
+\n<!-- ===== v34 verified UI/state fixes; generation engine untouched ===== -->
+<style id="v34-ui-fixes">
+/* Admin request calendar: edge-to-edge, no card gaps, maximize each day cell. */
+@media(max-width:700px){
+  #pInput{margin-left:-10px!important;margin-right:-10px!important;width:calc(100% + 20px)!important;max-width:none!important;border-radius:0!important;padding-left:0!important;padding-right:0!important;overflow:hidden!important}
+  #pInput>h2{padding:0 12px!important}
+  #prodAdminReqCalendar{width:100%!important;margin:0!important;padding:0!important}
+}
+#prodAdminReqCalendar .prodCalendarTitle{margin:0!important;padding:8px 4px!important;border-top:1px solid #d8e4e2!important;border-bottom:1px solid #d8e4e2!important;background:#fff!important}
+#prodAdminReqCalendar .prodCal{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:0!important;margin:0!important;width:100%!important}
+#prodAdminReqCalendar .prodCalHead{padding:5px 0!important;border-right:1px solid #d8e4e2!important;border-bottom:1px solid #d8e4e2!important;background:#fff!important;font-size:11px!important}
+#prodAdminReqCalendar .prodCalHead:nth-child(7){border-right:0!important}
+#prodAdminReqCalendar .prodCalDay{border-radius:0!important;border:0!important;border-right:1px solid #d8e4e2!important;border-bottom:1px solid #d8e4e2!important;margin:0!important;padding:2px!important;min-height:112px!important;background:#fff!important;gap:1px!important;overflow:hidden!important}
+#prodAdminReqCalendar .prodCalDay:nth-child(7n){border-right:0!important}
+#prodAdminReqCalendar .prodCalDay.out{visibility:visible!important;background:#fafcfc!important;pointer-events:none!important}
+#prodAdminReqCalendar .v34Head{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;min-height:15px!important}
+#prodAdminReqCalendar .dn{font-size:11px!important;line-height:14px!important;padding:0 1px!important}
+#prodAdminReqCalendar .sun .dn,#prodAdminReqCalendar .holidayLike .dn{color:#c94f5f!important}
+#prodAdminReqCalendar .sat .dn{color:#526dc2!important}
+#prodAdminReqCalendar .holidayName{display:block!important;color:#b23850!important;background:#ffe7ec!important;border-radius:3px!important;padding:1px 2px!important;margin:0 0 1px!important;font-size:7px!important;font-weight:800!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important}
+#prodAdminReqCalendar .v34Names{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:repeat(6,14px)!important;grid-auto-flow:row!important;gap:0!important;overflow:hidden!important;margin-top:1px!important}
+#prodAdminReqCalendar .v34Name{min-width:0!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;font-size:8.5px!important;font-weight:800!important;line-height:14px!important;letter-spacing:-.07em!important;padding:0!important}
+#prodAdminReqCalendar .v34Name.reqOff{color:#a94a5b!important}#prodAdminReqCalendar .v34Name.reqWork{color:#28705d!important}
+#prodAdminReqCalendar .prodDayAdjBadge{font-size:8px!important;line-height:1!important;padding:2px 3px!important;border-radius:5px!important;background:#e6f4f4!important;color:#176a6a!important}
+/* Admin day editor */
+#prodUnifiedModal .v34DayRow{display:grid!important;grid-template-columns:minmax(54px,.8fr) 58px minmax(54px,1fr) 10px minmax(54px,1fr)!important;gap:4px!important;align-items:center!important;padding:5px 0!important;border-bottom:1px solid #edf2f2!important}
+#prodUnifiedModal .v34DayRow button,#prodUnifiedModal .v34DayRow select{min-width:0!important;width:100%!important;padding:6px 3px!important;font-size:11px!important}
+#prodUnifiedModal .v34State{border-radius:7px!important;padding:6px 2px!important;text-align:center!important;font-size:10px!important;font-weight:800!important}
+#prodUnifiedModal .v34Work{background:#e8f3ff!important;color:#2f6597!important}.v34Off{background:#ffedf1!important;color:#9e4050!important}
+#prodUnifiedModal .v34Event{margin:10px 0!important;padding:10px 0!important;border-top:1px solid #dceced!important;border-bottom:1px solid #dceced!important}
+#prodUnifiedModal .v34EventLine{display:grid!important;grid-template-columns:minmax(0,1fr) 88px!important;gap:6px!important}.v34EventLine input,.v34EventLine select{width:100%!important}
+#prodUnifiedModal .v34Employees{display:flex!important;flex-wrap:wrap!important;gap:6px!important;margin-top:8px!important}.v34Employees label{font-size:11px!important;background:#f4f8f8!important;border-radius:7px!important;padding:5px 6px!important}
+/* Preview: designed for phone landscape. Whole 31-day period fits one sheet. */
+#preview .inner{max-width:none!important}
+#preview #sheet{overflow:hidden!important}
+#preview #sheet .pt{border-collapse:collapse!important;table-layout:fixed!important;width:100%!important}
+#preview #sheet .pt th,#preview #sheet .pt td{min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important}
+@media(orientation:landscape){
+ #preview{padding:2px!important;align-items:flex-start!important}
+ #preview .inner{width:100vw!important;max-width:100vw!important;max-height:100vh!important;border-radius:0!important;padding:5px!important}
+ #preview .mh{padding:2px 0 4px!important}.mh .note{display:none!important}
+ #preview #sheet .miniTitle{font-size:9px!important;margin:1px 0 3px!important}
+ #preview #sheet .pt{font-size:8px!important;line-height:1!important}
+ #preview #sheet .pt th,#preview #sheet .pt td{height:18px!important;padding:1px 0!important;font-size:8px!important}
+ #preview #sheet .pt th:first-child,#preview #sheet .pt td:first-child{width:62px!important;font-size:8px!important}
+ #preview #sheet .previewEvent{font-size:6px!important;line-height:1!important;white-space:normal!important;height:14px!important;overflow:hidden!important}
+}
+@media(orientation:portrait){#preview .inner{width:98vw!important;max-width:98vw!important}#preview #sheet .pt th,#preview #sheet .pt td{font-size:5.5px!important;padding:1px 0!important}#preview #sheet .pt th:first-child,#preview #sheet .pt td:first-child{width:48px!important}}
+</style>
+<script id="v34-state-fixes">
+(()=>{
+ const CP=x=>JSON.parse(JSON.stringify(x||{}));
+ const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const W='日月火水木金土';
+ const hall=()=>staff.filter(s=>s.role==='ホール');
+ const rawReq=(id,k)=>requests?.[id]?.[k]||{};
+ const defReq=s=>s?.input==='work'?{m:'×',ts:'',te:''}:{m:'○',ts:'',te:''};
+ const eff=(s,r)=>r?.m?r:defReq(s);
+ const holidayName=d=>typeof prodHolidayLabel==='function'?(prodHolidayLabel(d)||''):'';
+ const holidayLike=d=>typeof prodHolidayLike==='function'&&prodHolidayLike(d);
+ const tOpts=v=>'<option value="">－</option>'+Array.from({length:16},(_,i)=>i+9).map(h=>`<option value="${h}" ${String(v??'')===String(h)?'selected':''}>${h}時</option>`).join('');
+ const timeText=r=>{const a=r?.ts??(r?.d==='from'?r?.h:'')??'',b=r?.te??r?.end??(r?.d==='until'?r?.h:'')??'';return a&&b?`${a}〜${b}`:a?`${a}〜`:b?`〜${b}`:''};
+ function modal(){return document.getElementById('prodUnifiedModal')}
+ function dayDates(){return Array.isArray(dates)?dates:[]}
+ // Always render the CURRENT dates array. This fixes stale calendar after month/period changes.
+ window.prodRenderAdminCalendar=function(){
+   const host=document.getElementById('prodAdminReqCalendar'),ds=dayDates();if(!host||!ds.length)return;
+   const first=ds[0],cells=[];for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out"></div>');
+   for(const d of ds){const k=ymd(d),w=d.getDay(),hn=holidayName(d),hol=holidayLike(d),adj=Number((window.prodDayAdjust||{})[k]||0),names=[];
+     for(const st of hall()){const r=rawReq(st.id,k);if(!r?.m)continue;const state=r.m==='×'||r.m==='△'||r.m==='有給'?'reqOff':'reqWork';names.push(`<span class="v34Name ${state}">${E(String(st.name).slice(0,3))}</span>`);if(names.length>=12)break}
+     cells.push(`<div class="prodCalDay adminCalDay ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" data-v34-date="${k}"><div class="v34Head"><span class="dn">${d.getDate()}</span>${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</div>${hn?`<div class="holidayName">${E(hn)}</div>`:''}<div class="v34Names">${names.join('')}</div></div>`)
+   }
+   const miss=window.prodAdminInputMode==='submitted'?`<div class="submittedNote">未提出：${window.prodSubmissionStatus?.missing?.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';
+   host.innerHTML=`<div class="prodCalendarTitle">${first.getFullYear()}年${first.getMonth()+1}月</div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>${miss}`;
+ };
+ document.addEventListener('click',e=>{const c=e.target.closest?.('#prodAdminReqCalendar [data-v34-date]');if(c){e.preventDefault();prodOpenDay30(c.dataset.v34Date)}},true);
+ // Force period selector to rebuild dates + every dependent view, even if older handlers are stale.
+ const m=document.getElementById('month');if(m){m.onchange=function(){makeDates();renderAll();prodRenderAdminCalendar();if(typeof prodCloudSaveSilent==='function')prodCloudSaveSilent().catch(()=>{})};}
+ // Day editor keeps RAW request values in draft. Defaults are display-only until user changes them.
+ window.prodOpenDay30=window.prodOpenDayEditor=function(k){
+   if(window.prodAdminInputMode==='submitted'&&typeof prodOpenDayPicker==='function')return prodOpenDayPicker(k);
+   const d=new Date(k+'T00:00:00'),x=events?.[k],ev=x&&typeof x==='object'?{name:String(x.name??x.memo??''),start:String(x.start??'')}:{name:typeof x==='string'?x:'',start:''};
+   window.v34Draft={k,adj:Number((window.prodDayAdjust||{})[k]||0),rows:{},changed:{},event:ev,att:CP(eventAttend?.[k]||{})};hall().forEach(s=>v34Draft.rows[s.id]=CP(rawReq(s.id,k)));renderV34();modal().classList.remove('hide');
+ };
+ function renderV34(){const D=v34Draft,emps=hall().filter(s=>String(s.employment||s.category||'').includes('社員')).map(s=>`<label><input type="checkbox" ${D.att[s.id]?'checked':''} onchange="v34Draft.att['${s.id}']=this.checked">${E(s.name)}</label>`).join('');
+   const rows=hall().map(s=>{const r=eff(s,D.rows[s.id]),tm=timeText(r),state=tm?'出勤':r.m==='×'?'休み':r.m==='△'?'でき休':r.m==='有給'?'有給':'出勤',cl=(state==='休み'||state==='でき休')?'v34Off':'v34Work',a=r.ts??(r.d==='from'?r.h:'')??'',b=r.te??r.end??(r.d==='until'?r.h:'')??'';return `<div class="v34DayRow"><button class="sec" onclick="v34Toggle('${s.id}')">${E(s.name)}</button><div class="v34State ${cl}">${state}</div><select onchange="v34Time('${s.id}','ts',this.value)">${tOpts(a)}</select><span>〜</span><select onchange="v34Time('${s.id}','te',this.value)">${tOpts(b)}</select></div>`}).join('');
+   document.getElementById('prodUnifiedTitle').textContent=(()=>{const d=new Date(D.k+'T00:00:00');return `${d.getMonth()+1}月${d.getDate()}日（${W[d.getDay()]}）`})();
+   document.getElementById('prodUnifiedBody').innerHTML=`<div><b>人数補正</b> <select onchange="v34Draft.adj=Number(this.value)">${[-2,-1,0,1,2].map(v=>`<option value="${v}" ${v===D.adj?'selected':''}>${v>0?'+':''}${v}</option>`).join('')}</select></div><div class="v34Event"><b>イベント</b><div class="v34EventLine"><input value="${E(D.event.name)}" placeholder="イベント名" oninput="v34Draft.event.name=this.value"><select onchange="v34Draft.event.start=this.value">${tOpts(D.event.start)}</select></div><div class="v34Employees">${emps}</div></div>${rows}<div class="row" style="margin-top:12px"><button onclick="prodSaveDay34()">保存</button><button class="sec" onclick="prodCloseDay34()">閉じる</button></div>`;
+ }
+ window.v34Toggle=id=>{const s=hall().find(x=>String(x.id)===String(id)),r=eff(s,v34Draft.rows[id]);v34Draft.rows[id]=r.m==='×'?{m:'○',ts:'',te:''}:{m:'×',ts:'',te:''};v34Draft.changed[id]=true;renderV34()};
+ window.v34Time=(id,key,v)=>{const s=hall().find(x=>String(x.id)===String(id)),r=CP(eff(s,v34Draft.rows[id]));r[key]=v;if(r.ts||r.te)r.m='時間';else r.m=defReq(s).m;v34Draft.rows[id]=r;v34Draft.changed[id]=true;renderV34()};
+ window.prodCloseDay34=()=>{window.v34Draft=null;modal().classList.add('hide')};
+ window.prodSaveDay34=async()=>{const D=v34Draft;if(!D)return;const k=D.k;
+   for(const s of hall()){if(!D.changed[s.id])continue;requests[s.id]??={};requests[s.id][k]=CP(D.rows[s.id])}
+   window.prodDayAdjust=window.prodDayAdjust||{};window.prodDayAdjust[k]=Number(D.adj||0);prodDayAdjust=window.prodDayAdjust;
+   if(D.event.name||D.event.start)events[k]={name:D.event.name,memo:D.event.name,start:D.event.start,end:''};else delete events[k];
+   eventAttend[k]={};for(const [id,on] of Object.entries(D.att||{}))if(on)eventAttend[k][id]=true;
+   localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(window.prodDayAdjust));quickSave();
+   try{if(typeof prodCloudSaveSilent==='function')await prodCloudSaveSilent()}catch(e){console.error(e);alert('クラウド保存に失敗しました。通信状態を確認してください。');return}
+   window.v34Draft=null;modal().classList.add('hide');prodRenderAdminCalendar();
+ };
+ // Persist day adjustment in cloud state and restore it after cloud load.
+ window.prodState=function(){return {staff,requests,schedule,actual,events,eventAttend,prodDayAdjust:CP(window.prodDayAdjust||{}),monthStart:document.getElementById('month')?.value||''}};
+ window.prodCloudLoad=async function(){if(prodRole!=='admin')return;const j=await prodApi('admin_load');if(j.state&&Object.keys(j.state).length){applyDataObject(j.state);window.prodDayAdjust=CP(j.state.prodDayAdjust||{});prodDayAdjust=window.prodDayAdjust;localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(prodDayAdjust));if(j.state.monthStart&&document.getElementById('month'))document.getElementById('month').value=j.state.monthStart;makeDates();renderAll();prodRenderAdminCalendar()}};
+ // Preview functions: same one-sheet renderer for admin and staff; optimized by CSS for landscape.
+ function pubEvent(p,k){const x=p.events?.[k];if(!x)return'';const n=typeof x==='object'?(x.name??x.memo??''):x,st=typeof x==='object'?(x.start??''):'';return [n,st!==''?`${st}時`:''].filter(Boolean).join(' ')}
+ function table(p){if(!p?.dates?.length||!p?.staff)return'<tr><td>まだシフトは公開されていません</td></tr>';const hs=p.staff.filter(s=>s.role==='ホール'),evr='<tr><th></th>'+p.dates.map(k=>`<th><div class="previewEvent">${E(pubEvent(p,k))}</div></th>`).join('')+'</tr>',hdr='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${W[d.getDay()]}</th>`}).join('')+'</tr>',rows=hs.map(s=>'<tr><td>'+E(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id],ck=q&&p.eventAttend?.[k]?.[s.id]?' ✓':'';return `<td>${q?E(q.label??q.start)+ck:'／'}</td>`}).join('')+'</tr>').join('');return evr+hdr+rows}
+ function show(title,p,staffMode){const sh=document.getElementById('sheet'),pv=document.getElementById('preview');sh.innerHTML=`<div class="miniTitle">${E(title)} ホールシフト</div><table class="pt">${table(p)}</table>`;pv.classList.toggle('v33-staff-preview',!!staffMode);pv.classList.remove('hide')}
+ window.renderPreview=()=>show(document.getElementById('month').selectedOptions[0].textContent,{dates:dates.map(d=>ymd(d)),staff,schedule,events,eventAttend},false);
+ window.prodShiftView=function(v){const mm=document.getElementById('prodMonthShift'),dd=document.getElementById('prodDailyShift'),pp=document.getElementById('prodPreviewShift');if(v==='preview'){mm?.classList.add('hide');dd?.classList.add('hide');pp?.classList.add('hide');show('公開済み',prodBoot?.published||{},true);return}document.getElementById('preview')?.classList.remove('v33-staff-preview');mm?.classList.toggle('hide',v!=='month');dd?.classList.toggle('hide',v!=='daily');pp?.classList.add('hide');if(v==='daily'){const x=document.getElementById('prodDailyDate');if(x?.value)prodRenderDailyShift(x.value)}};
+})();
+</script>\n</body>
 </html>
 
 
