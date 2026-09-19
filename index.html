@@ -11099,121 +11099,128 @@ body.prodStaffMode #preview.v33-staff-preview{display:flex!important;z-index:999
 })();
 </script>
 
-<!-- ===== v35 calendar/state/persistence fixes 2026-09-19 — generation engine untouched ===== -->
-<style id="v35-calendar-state-fixes">
-/* 管理者カレンダー：画面幅を最大利用、セル間ギャップなし */
-body:not(.prodStaffMode) #prodAdminReqCalendar{width:calc(100vw - 2px)!important;max-width:none!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important;margin-left:0!important;margin-right:0!important}
-#prodAdminReqCalendar .v35CalNav{display:grid!important;grid-template-columns:42px 1fr 42px!important;align-items:center!important;gap:4px!important;padding:0 3px 7px!important}
-#prodAdminReqCalendar .v35CalNav button{height:34px!important;padding:0!important;border-radius:8px!important;font-size:20px!important}
-#prodAdminReqCalendar .v35CalTitle{text-align:center!important;font-size:20px!important;font-weight:900!important;color:#38504e!important}
-#prodAdminReqCalendar .prodCal{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:0!important;width:100%!important;border-top:1px solid #d7e2e1!important;border-left:1px solid #d7e2e1!important;background:#fff!important}
-#prodAdminReqCalendar .prodCalHead{border:0!important;border-right:1px solid #d7e2e1!important;border-bottom:1px solid #d7e2e1!important;border-radius:0!important;background:#f7fbfb!important;padding:5px 0!important;font-size:11px!important;line-height:1!important;color:#536967!important}
-#prodAdminReqCalendar .prodCalHead:first-child{color:#bd5363!important;background:#fff8fa!important}#prodAdminReqCalendar .prodCalHead:nth-child(7){color:#4e79ad!important;background:#f8fbff!important}
-#prodAdminReqCalendar .prodCalDay{border:0!important;border-right:1px solid #d7e2e1!important;border-bottom:1px solid #d7e2e1!important;border-radius:0!important;box-shadow:none!important;min-width:0!important;height:112px!important;min-height:112px!important;padding:3px 2px!important;overflow:hidden!important;background:#fff!important;cursor:pointer!important}
-#prodAdminReqCalendar .prodCalDay.out{visibility:visible!important;background:#fafcfc!important;cursor:default!important}
-#prodAdminReqCalendar .prodCalDay.sun,#prodAdminReqCalendar .prodCalDay.holidayLike{background:#fff9fa!important}#prodAdminReqCalendar .prodCalDay.sat{background:#f8fbff!important}
-#prodAdminReqCalendar .v35DayHead{height:19px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:1px!important;line-height:1!important}
-#prodAdminReqCalendar .dn{display:inline!important;min-width:0!important;height:auto!important;border-radius:0!important;background:transparent!important;padding:0!important;font-size:12px!important;line-height:1!important;font-weight:900!important;color:#334846!important}
-#prodAdminReqCalendar .sun .dn,#prodAdminReqCalendar .holidayLike .dn{color:#bd5363!important}#prodAdminReqCalendar .sat .dn{color:#4e79ad!important}
-#prodAdminReqCalendar .holidayName{height:12px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:clip!important;font-size:7px!important;line-height:11px!important;color:#b23850!important;margin:0!important;padding:0!important}
-#prodAdminReqCalendar .v35Names{height:84px!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:repeat(6,14px)!important;grid-auto-flow:row!important;gap:0!important;overflow:hidden!important}
-#prodAdminReqCalendar .v35Name{min-width:0!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;font-size:8.5px!important;font-weight:800!important;line-height:14px!important;letter-spacing:-.08em!important;padding:0!important}
-#prodAdminReqCalendar .v35Name.reqOff{color:#a94a5b!important}#prodAdminReqCalendar .v35Name.reqWork{color:#28705d!important}
-#prodAdminReqCalendar .prodDayAdjBadge{position:static!important;margin:0!important;padding:1px 3px!important;font-size:8px!important;line-height:1.1!important;border-radius:5px!important;background:#e6f4f4!important;color:#176a6a!important}
-#prodAdminReqCalendar .submittedNote{margin:8px 4px!important}
-/* 日別編集：未登録を表示せず、入力方式のデフォルトを色付きで表示 */
-#prodUnifiedModal .prodDayEditorRow .state.v35-work{background:#e8f3ff!important;color:#2f6597!important;border:1px solid #cfe2f5!important;border-radius:7px;padding:5px 4px!important;font-weight:800!important;text-align:center!important}
-#prodUnifiedModal .prodDayEditorRow .state.v35-off{background:#ffedf1!important;color:#9e4050!important;border:1px solid #f2d5dc!important;border-radius:7px;padding:5px 4px!important;font-weight:800!important;text-align:center!important}
-/* 月間プレビュー：横向き時に1画面へ収めつつ可読性を優先 */
-@media (orientation:landscape) and (max-height:600px){
- #preview .inner{width:99vw!important;max-width:99vw!important;height:98vh!important;max-height:98vh!important;padding:5px!important;border-radius:8px!important;overflow:hidden!important}
- #preview .mh{height:32px!important;min-height:32px!important;padding:0 0 3px!important;align-items:center!important}
- #preview #sheet{width:100%!important;height:calc(98vh - 38px)!important;overflow:hidden!important}
- #preview #sheet .miniTitle{font-size:9px!important;line-height:1!important;margin:0 0 2px!important}
- #preview #sheet .pt{width:100%!important;height:auto!important;table-layout:fixed!important;font-size:7.2px!important;line-height:1!important}
- #preview #sheet .pt th,#preview #sheet .pt td{padding:1px 0!important;height:18px!important;min-width:0!important;font-size:7.2px!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important}
- #preview #sheet .pt th:first-child,#preview #sheet .pt td:first-child{width:58px!important;font-size:8px!important}
- #preview #sheet .previewEvent{font-size:5.8px!important;line-height:1!important;height:12px!important;white-space:normal!important;overflow:hidden!important}
+<!-- ===== v36 safe UI fix: no recursive wrappers ===== -->
+<style id="v36-safe-ui">
+/* 管理者カレンダー: 画面幅を最大限使用、隙間なし7列 */
+body:not(.prodStaffMode) #prodAdminReqCalendar{width:100vw!important;max-width:100vw!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important;margin:0!important;padding:0 1px!important}
+#prodAdminReqCalendar .v36Nav{display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:4px;padding:4px 4px 8px}
+#prodAdminReqCalendar .v36Title{text-align:center;font-size:20px;font-weight:900}
+#prodAdminReqCalendar .v36Nav button{height:38px;padding:0!important;font-size:24px}
+#prodAdminReqCalendar .prodCal{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:0!important;width:100%!important;border-top:1px solid #d8e4e2!important;border-left:1px solid #d8e4e2!important}
+#prodAdminReqCalendar .prodCalHead{padding:5px 0!important;font-size:11px!important;border-right:1px solid #d8e4e2!important;border-bottom:1px solid #d8e4e2!important;background:#f8fbfb!important}
+#prodAdminReqCalendar .prodCalHead:first-child{color:#bd4656!important}#prodAdminReqCalendar .prodCalHead:last-of-type{color:#486bb6!important}
+#prodAdminReqCalendar .prodCalDay{border:0!important;border-right:1px solid #d8e4e2!important;border-bottom:1px solid #d8e4e2!important;border-radius:0!important;min-width:0!important;min-height:126px!important;padding:3px 2px!important;background:#fff!important;overflow:hidden!important}
+#prodAdminReqCalendar .prodCalDay.out{visibility:hidden!important}
+#prodAdminReqCalendar .prodCalDay.sun .dn,#prodAdminReqCalendar .prodCalDay.holidayLike .dn{color:#bd4656!important}#prodAdminReqCalendar .prodCalDay.sat .dn{color:#486bb6!important}
+#prodAdminReqCalendar .v36DayHead{height:18px;display:flex;align-items:center;justify-content:space-between;gap:1px}
+#prodAdminReqCalendar .dn{font-size:13px!important;font-weight:900!important}
+#prodAdminReqCalendar .holidayName{height:13px!important;line-height:12px!important;font-size:7px!important;color:#bd4656!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;margin:0!important}
+#prodAdminReqCalendar .v36Names{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:repeat(6,14px)!important;grid-auto-flow:row!important;gap:1px 0!important;height:89px!important;overflow:hidden!important}
+#prodAdminReqCalendar .v36Name{display:block!important;min-width:0!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;font-size:9px!important;font-weight:800!important;line-height:14px!important;letter-spacing:-.08em!important;padding:0!important}
+#prodAdminReqCalendar .v36Name.reqOff{color:#a94a5b!important}#prodAdminReqCalendar .v36Name.reqWork{color:#28705d!important}
+#prodAdminReqCalendar .prodDayAdjBadge{font-size:8px!important;line-height:12px!important;padding:0 3px!important;border-radius:6px!important;background:#eef6f6!important;color:#466!important}
+/* 日別編集のデフォルト */
+#prodUnifiedModal .prodDayEditorRow .state.v36-work{background:#e8f3ff!important;color:#2f6597!important;border:1px solid #cfe2f5!important;border-radius:7px;padding:5px 4px;font-weight:800;text-align:center}
+#prodUnifiedModal .prodDayEditorRow .state.v36-off{background:#ffedf1!important;color:#9e4050!important;border:1px solid #f2d5dc!important;border-radius:7px;padding:5px 4px;font-weight:800;text-align:center}
+/* 横向きで月間を1枚にしつつ可読性を確保 */
+@media (orientation:landscape){
+ #preview .inner{width:99vw!important;max-width:99vw!important;max-height:98vh!important;padding:6px!important;border-radius:8px!important}
+ #preview #sheet{width:100%!important;overflow:hidden!important}
+ #preview #sheet .pt{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:8px!important}
+ #preview #sheet .pt th,#preview #sheet .pt td{min-width:0!important;width:auto!important;height:20px!important;padding:1px 0!important;line-height:1.05!important;font-size:8px!important;white-space:nowrap!important;overflow:hidden!important}
+ #preview #sheet .pt th:first-child,#preview #sheet .pt td:first-child{width:64px!important;font-size:9px!important}
+ #preview #sheet .previewEvent{font-size:6px!important;line-height:1!important;max-height:14px!important;overflow:hidden!important}
 }
+@media(max-width:430px){#prodAdminReqCalendar .prodCalDay{min-height:126px!important}#prodAdminReqCalendar .v36Name{font-size:8.5px!important}}
 </style>
-<script id="v35-calendar-state-fixes-script">
+<script id="v36-safe-ui-script">
 (()=>{
- const UIKEY='kadokura_ui_state_v35';
+ 'use strict';
+ const UIKEY='kadokura_ui_v36';
  const CP=o=>JSON.parse(JSON.stringify(o||{}));
  const H=()=>staff.filter(s=>s.role==='ホール');
  const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const W='日月火水木金土';
- const loadUI=()=>{try{return JSON.parse(sessionStorage.getItem(UIKEY)||'{}')}catch(_){return {}}};
- const saveUI=p=>{try{sessionStorage.setItem(UIKEY,JSON.stringify({...loadUI(),...p}))}catch(_){}};
- const clearUI=()=>{try{sessionStorage.removeItem(UIKEY)}catch(_){}};
- const keyOf=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ const key=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
  const defaultReq=s=>s?.input==='work'?{m:'×',ts:'',te:''}:{m:'○',ts:'',te:''};
  const effective=(s,r)=>r&&r.m?r:defaultReq(s);
- const sameDefault=(s,r)=>{const d=defaultReq(s);return r&&r.m===d.m&&!r.ts&&!r.te&&!r.h&&!r.end};
+ const sameDefault=(s,r)=>{const d=defaultReq(s);return r?.m===d.m&&!r?.ts&&!r?.te&&!r?.h&&!r?.end&&!r?.d};
  const timeText=r=>{const a=r?.ts??(r?.d==='from'?r?.h:'')??'',b=r?.te??r?.end??(r?.d==='until'?r?.h:'')??'';return a&&b?`${a}〜${b}`:a?`${a}〜`:b?`〜${b}`:''};
  const timeOpts=v=>'<option value="">－</option>'+Array.from({length:16},(_,i)=>i+9).map(h=>`<option value="${h}" ${String(v??'')===String(h)?'selected':''}>${h}時</option>`).join('');
- function monthBase(){const u=loadUI(),m=/^(\d{4})-(\d{2})$/.exec(u.calendarMonth||'');if(m)return new Date(+m[1],+m[2]-1,1);const s=document.getElementById('month')?.value;if(s){const d=new Date(s+'T00:00:00');return new Date(d.getFullYear(),d.getMonth(),1)}return new Date(new Date().getFullYear(),new Date().getMonth(),1)}
- let calMonth=monthBase();
+ const loadUI=()=>{try{return JSON.parse(sessionStorage.getItem(UIKEY)||'{}')}catch(_){return{}}};
+ const saveUI=p=>{try{sessionStorage.setItem(UIKEY,JSON.stringify({...loadUI(),...p}))}catch(_){}};
+ const clearUI=()=>{try{sessionStorage.removeItem(UIKEY)}catch(_){}};
+ let u0=loadUI(),calMonth=null;
+ function targetCalMonth(){const s=document.getElementById('month')?.value;if(s){const d=new Date(s+'T00:00:00');return new Date(d.getFullYear(),d.getMonth(),1)}const n=new Date();return new Date(n.getFullYear(),n.getMonth(),1)}
+ if(u0.calendarMonth&&/^(\d{4})-(\d{2})$/.test(u0.calendarMonth)){const [,y,m]=u0.calendarMonth.match(/^(\d{4})-(\d{2})$/);calMonth=new Date(+y,+m-1,1)}else calMonth=targetCalMonth();
  function rememberMonth(){saveUI({calendarMonth:`${calMonth.getFullYear()}-${String(calMonth.getMonth()+1).padStart(2,'0')}`})}
- window.prodCalendarMove=function(delta){calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+Number(delta||0),1);rememberMonth();prodRenderAdminCalendar()};
- window.prodCalendarToday=function(){const s=document.getElementById('month')?.value;if(s){const d=new Date(s+'T00:00:00');calMonth=new Date(d.getFullYear(),d.getMonth(),1)}else{const n=new Date();calMonth=new Date(n.getFullYear(),n.getMonth(),1)}rememberMonth();prodRenderAdminCalendar()};
+ window.prodCalendarMove=function(delta){calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+Number(delta),1);rememberMonth();prodRenderAdminCalendar()};
+ window.prodCalendarReset=function(){calMonth=targetCalMonth();rememberMonth();prodRenderAdminCalendar()};
  window.prodRenderAdminCalendar=function(){
    const host=document.getElementById('prodAdminReqCalendar');if(!host)return;
+   if(!(calMonth instanceof Date)||Number.isNaN(calMonth.getTime()))calMonth=targetCalMonth();
    const y=calMonth.getFullYear(),m=calMonth.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0),cells=[];
    for(let i=0;i<first.getDay();i++)cells.push('<div class="prodCalDay out" aria-hidden="true"></div>');
    for(let n=1;n<=last.getDate();n++){
-     const d=new Date(y,m,n),k=keyOf(d),w=d.getDay(),hol=typeof prodHolidayLike==='function'&&prodHolidayLike(d),hn=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'',names=[];
+     const d=new Date(y,m,n),k=key(d),w=d.getDay(),hol=typeof prodHolidayLike==='function'&&prodHolidayLike(d),hn=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'',names=[];
      for(const s of H()){
        const r=typeof reqObj==='function'?reqObj(s.id,k):(requests?.[s.id]?.[k]||{});if(!r?.m)continue;
-       names.push(`<span class="v35Name ${s.input==='work'?'reqWork':'reqOff'}">${E(String(s.name).slice(0,3))}</span>`);if(names.length===12)break;
+       names.push(`<span class="v36Name ${s.input==='work'?'reqWork':'reqOff'}">${E(String(s.name).slice(0,3))}</span>`);if(names.length>=12)break;
      }
      const adj=Number((window.prodDayAdjust||prodDayAdjust||{})[k]||0);
-     cells.push(`<div class="prodCalDay ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" data-v35-date="${k}"><div class="v35DayHead"><span class="dn">${n}</span>${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</div>${hn?`<div class="holidayName">${E(hn)}</div>`:'<div class="holidayName"></div>'}<div class="v35Names">${names.join('')}</div></div>`);
+     cells.push(`<div class="prodCalDay ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" onclick="prodOpenDay36('${k}')"><div class="v36DayHead"><span class="dn">${n}</span>${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</div><div class="holidayName">${hn?E(hn):''}</div><div class="v36Names">${names.join('')}</div></div>`);
    }
    while((first.getDay()+last.getDate())%7!==0)cells.push('<div class="prodCalDay out" aria-hidden="true"></div>');
-   const miss=window.prodAdminInputMode==='submitted'?`<div class="submittedNote">未提出：${window.prodSubmissionStatus?.missing?.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';
-   host.innerHTML=`<div class="v35CalNav"><button class="sec" onclick="prodCalendarMove(-1)" aria-label="前月">‹</button><div class="v35CalTitle">${y}年${m+1}月</div><button class="sec" onclick="prodCalendarMove(1)" aria-label="翌月">›</button></div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>${miss}`;
+   const miss=window.prodAdminInputMode==='submitted'?`<div class="submittedNote" style="margin:8px 4px">未提出：${window.prodSubmissionStatus?.missing?.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';
+   host.innerHTML=`<div class="v36Nav"><button class="sec" onclick="prodCalendarMove(-1)" aria-label="前月">‹</button><div class="v36Title" onclick="prodCalendarReset()">${y}年${m+1}月</div><button class="sec" onclick="prodCalendarMove(1)" aria-label="翌月">›</button></div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>${miss}`;
  };
- document.addEventListener('click',e=>{const c=e.target.closest?.('#prodAdminReqCalendar [data-v35-date]');if(c){e.preventDefault();prodOpenDay35(c.dataset.v35Date)}},true);
  function modal(){return document.getElementById('prodUnifiedModal')}
- function setHead(){const h=modal()?.querySelector('.prodModalHead');if(!h)return;h.querySelectorAll('.prodModalClose,.prodModalHeadActions').forEach(x=>x.remove());const a=document.createElement('div');a.className='prodModalHeadActions';a.innerHTML='<button onclick="prodSaveDay35()">保存</button><button class="sec" onclick="prodCloseDay35()">閉じる</button>';h.appendChild(a)}
+ function setHead(){const h=modal()?.querySelector('.prodModalHead');if(!h)return;h.querySelectorAll('.prodModalClose,.v36HeadActions').forEach(x=>x.remove());const a=document.createElement('div');a.className='v36HeadActions';a.innerHTML='<button onclick="prodSaveDay36()">保存</button><button class="sec" onclick="prodCloseDay36()">閉じる</button>';h.appendChild(a)}
  function eventFor(k){const x=events?.[k];return x&&typeof x==='object'?{name:String(x.name??x.memo??''),start:String(x.start??x.time??'')}:{name:typeof x==='string'?x:'',start:''}}
- window.prodOpenDay35=function(k){
+ window.prodOpenDay36=function(k){
    if(window.prodAdminInputMode==='submitted'&&typeof prodOpenDayPicker==='function')return prodOpenDayPicker(k);
-   const d=new Date(k+'T00:00:00');window.v35DayDraft={k,adj:Number((window.prodDayAdjust||prodDayAdjust||{})[k]||0),rows:{},event:eventFor(k),att:{...(eventAttend?.[k]||{})}};
-   H().forEach(s=>{const raw=typeof reqObj==='function'?reqObj(s.id,k):(requests?.[s.id]?.[k]||{});v35DayDraft.rows[s.id]=CP(raw?.m?raw:defaultReq(s))});
-   document.getElementById('prodUnifiedTitle').textContent=`${d.getMonth()+1}月${d.getDate()}日（${W[d.getDay()]}）`;renderEditor();setHead();modal().classList.remove('hide');
+   const d=new Date(k+'T00:00:00');window.v36DayDraft={k,adj:Number((window.prodDayAdjust||prodDayAdjust||{})[k]||0),rows:{},event:eventFor(k),att:{...(eventAttend?.[k]||{})}};
+   H().forEach(s=>{const raw=typeof reqObj==='function'?reqObj(s.id,k):(requests?.[s.id]?.[k]||{});v36DayDraft.rows[s.id]=CP(raw?.m?raw:defaultReq(s))});
+   document.getElementById('prodUnifiedTitle').textContent=`${d.getMonth()+1}月${d.getDate()}日（${W[d.getDay()]}）`;renderEditor();setHead();modal()?.classList.remove('hide');
  };
- window.prodOpenDay30=window.prodOpenDayEditor=window.prodOpenDay35;
- function renderEditor(){const D=v35DayDraft;if(!D)return;const emps=H().filter(s=>s.employment==='社員').map(s=>`<label><input type="checkbox" ${D.att[s.id]?'checked':''} onchange="v35DayDraft.att['${s.id}']=this.checked">${E(s.name)}</label>`).join('');
-   const rows=H().map(s=>{const r=effective(s,D.rows[s.id]),tm=timeText(r),state=tm?'出勤':r.m==='△'?'でき休':r.m==='有給'?'有給':r.m==='×'?'休み':'出勤',cls=(state==='休み'||state==='でき休')?'v35-off':'v35-work',a=r.ts??(r.d==='from'?r.h:'')??'',b=r.te??r.end??(r.d==='until'?r.h:'')??'';return `<div class="prodDayEditorRow"><button class="nm sec" onclick="v35Toggle('${s.id}')">${E(s.name)}</button><div class="state ${cls}">${state}</div><select onchange="v35Time('${s.id}','ts',this.value)">${timeOpts(a)}</select><span>〜</span><select onchange="v35Time('${s.id}','te',this.value)">${timeOpts(b)}</select></div>`}).join('');
-   document.getElementById('prodUnifiedBody').innerHTML=`<div class="prodAdjLine"><b>人数補正</b><select onchange="v35DayDraft.adj=Number(this.value)">${[-2,-1,0,1,2].map(v=>`<option value="${v}" ${v===D.adj?'selected':''}>${v>0?'+':''}${v}</option>`).join('')}</select></div><div class="prodEventEditor"><div class="prodEventTitle">イベント</div><div class="prodEventLine"><input value="${E(D.event.name)}" placeholder="イベント名" oninput="v35DayDraft.event.name=this.value"><select onchange="v35DayDraft.event.start=this.value">${timeOpts(D.event.start)}</select><button class="sec" onclick="this.parentNode.nextElementSibling.classList.toggle('hide')">参加者</button></div><div class="prodEventParticipants hide">${emps}</div></div><div class="prodDayEditorRows">${rows}</div>`;
+ window.prodOpenDay30=window.prodOpenDayEditor=window.prodOpenDay36;
+ function renderEditor(){const D=window.v36DayDraft;if(!D)return;const emps=H().filter(s=>s.employment==='社員').map(s=>`<label><input type="checkbox" ${D.att[s.id]?'checked':''} onchange="v36DayDraft.att['${s.id}']=this.checked">${E(s.name)}</label>`).join('');
+   const rows=H().map(s=>{const r=effective(s,D.rows[s.id]),tm=timeText(r),state=tm?'出勤':r.m==='△'?'でき休':r.m==='有給'?'有給':r.m==='×'?'休み':'出勤',cls=(state==='休み'||state==='でき休')?'v36-off':'v36-work',a=r.ts??(r.d==='from'?r.h:'')??'',b=r.te??r.end??(r.d==='until'?r.h:'')??'';return `<div class="prodDayEditorRow"><button class="nm sec" onclick="v36Toggle('${s.id}')">${E(s.name)}</button><div class="state ${cls}">${state}</div><select onchange="v36Time('${s.id}','ts',this.value)">${timeOpts(a)}</select><span>〜</span><select onchange="v36Time('${s.id}','te',this.value)">${timeOpts(b)}</select></div>`}).join('');
+   document.getElementById('prodUnifiedBody').innerHTML=`<div class="prodAdjLine"><b>人数補正</b><select onchange="v36DayDraft.adj=Number(this.value)">${[-2,-1,0,1,2].map(v=>`<option value="${v}" ${v===D.adj?'selected':''}>${v>0?'+':''}${v}</option>`).join('')}</select></div><div class="prodEventEditor"><div class="prodEventTitle">イベント</div><div class="prodEventLine"><input value="${E(D.event.name)}" placeholder="イベント名" oninput="v36DayDraft.event.name=this.value"><select onchange="v36DayDraft.event.start=this.value">${timeOpts(D.event.start)}</select><button class="sec" onclick="this.parentNode.nextElementSibling.classList.toggle('hide')">参加者</button></div><div class="prodEventParticipants hide">${emps}</div></div><div class="prodDayEditorRows">${rows}</div>`;
  }
- window.v35Toggle=id=>{const s=H().find(x=>String(x.id)===String(id)),r=effective(s,v35DayDraft.rows[id]);v35DayDraft.rows[id]=r.m==='×'?{m:'○',ts:'',te:''}:{m:'×',ts:'',te:''};renderEditor()};
- window.v35Time=(id,key,v)=>{const s=H().find(x=>String(x.id)===String(id)),r=v35DayDraft.rows[id]||(v35DayDraft.rows[id]=defaultReq(s));r[key]=v;if(r.ts||r.te)r.m='時間';else r.m=defaultReq(s).m;renderEditor()};
- window.prodCloseDay35=()=>{window.v35DayDraft=null;modal()?.classList.add('hide')};
- window.prodSaveDay35=async()=>{const D=v35DayDraft;if(!D)return;const k=D.k;
+ window.v36Toggle=id=>{const s=H().find(x=>String(x.id)===String(id)),r=effective(s,v36DayDraft.rows[id]);v36DayDraft.rows[id]=r.m==='×'?{m:'○',ts:'',te:''}:{m:'×',ts:'',te:''};renderEditor()};
+ window.v36Time=(id,k,v)=>{const s=H().find(x=>String(x.id)===String(id)),r=v36DayDraft.rows[id]||(v36DayDraft.rows[id]=defaultReq(s));r[k]=v;if(r.ts||r.te)r.m='時間';else r.m=defaultReq(s).m;renderEditor()};
+ window.prodCloseDay36=()=>{window.v36DayDraft=null;modal()?.classList.add('hide')};
+ window.prodSaveDay36=async()=>{const D=window.v36DayDraft;if(!D)return;const k=D.k;
    H().forEach(s=>{requests[s.id]??={};const r=CP(D.rows[s.id]||defaultReq(s));if(sameDefault(s,r))delete requests[s.id][k];else requests[s.id][k]=r});
-   window.prodDayAdjust=window.prodDayAdjust||prodDayAdjust||{};prodDayAdjust=window.prodDayAdjust;prodDayAdjust[k]=Number(D.adj||0);if(!prodDayAdjust[k])delete prodDayAdjust[k];
+   window.prodDayAdjust=window.prodDayAdjust||prodDayAdjust||{};prodDayAdjust=window.prodDayAdjust;const av=Number(D.adj||0);if(av)prodDayAdjust[k]=av;else delete prodDayAdjust[k];
    const nm=String(D.event.name||'').trim(),st=String(D.event.start||'');if(nm||st)events[k]={name:nm,memo:nm,start:st,end:''};else delete events[k];
-   eventAttend[k]={};H().filter(s=>s.employment==='社員').forEach(s=>{if(D.att[s.id])eventAttend[k][s.id]=true});if(!Object.keys(eventAttend[k]).length)delete eventAttend[k];
+   const aa={};H().filter(s=>s.employment==='社員').forEach(s=>{if(D.att[s.id])aa[s.id]=true});if(Object.keys(aa).length)eventAttend[k]=aa;else delete eventAttend[k];
    try{localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(prodDayAdjust));quickSave()}catch(_){ }
-   window.v35DayDraft=null;modal()?.classList.add('hide');prodRenderAdminCalendar();if(typeof renderAll==='function')renderAll();prodRenderAdminCalendar();
+   window.v36DayDraft=null;modal()?.classList.add('hide');
+   /* 先に画面へ即時反映。クラウド通信を待たない */
+   if(typeof renderAll==='function')renderAll();prodRenderAdminCalendar();
    if(typeof prodCloudSaveSilent==='function'){try{await prodCloudSaveSilent()}catch(e){console.warn('cloud save failed',e)}}
  };
- // UI状態保持。明示的ログアウト時だけ消す。
- const oldLogout=window.prodLogout;window.prodLogout=function(){clearUI();return oldLogout.apply(this,arguments)};
- const oldShowPanel=window.showPanel;window.showPanel=function(name){saveUI({adminPanel:name});return oldShowPanel.apply(this,arguments)};
- const oldAdminMode=window.prodAdminMode;window.prodAdminMode=async function(mode){saveUI({role:'admin',pin:'1',adminMode:mode});const r=await oldAdminMode.apply(this,arguments);const u=loadUI();if(u.adminPanel&&typeof oldShowPanel==='function')oldShowPanel(u.adminPanel);prodRenderAdminCalendar();return r};
- const oldStaffChoose=window.prodStaffChoose;window.prodStaffChoose=function(t){saveUI({role:'staff',pin:'10',staffChoice:t});return oldStaffChoose.apply(this,arguments)};
- const oldShiftView=window.prodShiftView;window.prodShiftView=function(v){saveUI({staffShiftView:v});return oldShiftView.apply(this,arguments)};
- const oldLogin=window.prodLogin;window.prodLogin=async function(){const pin=document.getElementById('prodPin')?.value.trim();const r=await oldLogin.apply(this,arguments);if(pin==='1')saveUI({role:'admin',pin:'1'});if(pin==='10'&&prodRole==='staff')saveUI({role:'staff',pin:'10'});return r};
- const monthSel=document.getElementById('month');if(monthSel){monthSel.addEventListener('change',()=>{const d=new Date(monthSel.value+'T00:00:00');calMonth=new Date(d.getFullYear(),d.getMonth(),1);saveUI({targetMonth:monthSel.value,calendarMonth:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`});setTimeout(()=>prodRenderAdminCalendar(),0)},true)}
- async function restore(){const u=loadUI();if(!u.role)return;if(u.targetMonth&&monthSel&&[...monthSel.options].some(o=>o.value===u.targetMonth)){monthSel.value=u.targetMonth;makeDates();renderAll()}if(u.calendarMonth){const m=/^(\d{4})-(\d{2})$/.exec(u.calendarMonth);if(m)calMonth=new Date(+m[1],+m[2]-1,1)}
-   if(u.role==='admin'){prodRole='admin';prodPin='1';document.getElementById('prodLogin')?.classList.add('hide');document.getElementById('prodRoleMenu')?.classList.add('hide');document.body.classList.remove('prodStaffMode');document.getElementById('prodStaffApp')?.classList.add('hide');if(u.adminMode){window.prodAdminInputMode=u.adminMode;if(u.adminPanel&&typeof oldShowPanel==='function')oldShowPanel(u.adminPanel);prodRenderAdminCalendar()}else prodSetAdminVisible(true);return}
-   if(u.role==='staff'){prodRole='staff';prodPin='10';try{prodBoot=await prodApi('staff_bootstrap');prodOpenStaff();if(u.staffChoice)oldStaffChoose(u.staffChoice);if(u.staffChoice==='shift'&&u.staffShiftView)oldShiftView(u.staffShiftView)}catch(e){clearUI();prodRole=null;prodPin='';document.getElementById('prodLogin')?.classList.remove('hide')}}
- }
- setTimeout(restore,0);
+ /* 対象期間変更は対象期間だけ更新し、カレンダー表示月もその開始月へ同期。データ自体は削除しない */
+ const monthSel=document.getElementById('month');
+ if(monthSel&&!monthSel.dataset.v36){monthSel.dataset.v36='1';monthSel.addEventListener('change',()=>{const d=new Date(monthSel.value+'T00:00:00');if(!Number.isNaN(d.getTime())){calMonth=new Date(d.getFullYear(),d.getMonth(),1);rememberMonth();saveUI({targetMonth:monthSel.value})}setTimeout(prodRenderAdminCalendar,0)},false)}
+ /* 画面状態はイベントで記録。既存関数をラップしないため再帰ループを作らない */
+ document.addEventListener('click',e=>{const b=e.target.closest?.('button');if(!b)return;const t=b.textContent.trim();if(['希望入力','月間','日別','勤務時間','スタッフ'].includes(t))saveUI({adminPanel:t});if(t==='ログアウト'||t==='トップに戻る')clearUI();},false);
+ document.addEventListener('change',e=>{if(e.target?.id==='prodStaffName')saveUI({staffName:e.target.value});},false);
+ /* ログイン成功後の状態だけ保存 */
+ document.getElementById('prodPin')?.addEventListener('change',e=>{const p=e.target.value.trim();if(p==='1'||p==='10')saveUI({role:p==='1'?'admin':'staff'})});
+ /* リロード復帰: 関数の相互ラップをせず、既存の正規ログインを1回だけ呼ぶ */
+ let restoring=false;
+ async function restoreOnce(){if(restoring)return;restoring=true;const u=loadUI();try{
+   if(u.targetMonth&&monthSel&&[...monthSel.options].some(o=>o.value===u.targetMonth)){monthSel.value=u.targetMonth;if(typeof makeDates==='function')makeDates();if(typeof renderAll==='function')renderAll()}
+   if(u.calendarMonth){const m=/^(\d{4})-(\d{2})$/.exec(u.calendarMonth);if(m)calMonth=new Date(+m[1],+m[2]-1,1)}
+   if(u.role==='admin'){prodRole='admin';prodPin='1';prodSetAdminVisible(true);document.getElementById('prodRoleMenu')?.classList.add('hide');prodRenderAdminCalendar();return}
+   if(u.role==='staff'){prodRole='staff';prodPin='10';prodBoot=await prodApi('staff_bootstrap');prodOpenStaff();if(u.staffName){const s=document.getElementById('prodStaffName');if(s&&[...s.options].some(o=>o.value===u.staffName)){s.value=u.staffName;if(typeof prodStaffNameChosen==='function')prodStaffNameChosen()}}}
+ }catch(e){clearUI();prodRole=null;prodPin='';document.body.classList.remove('prodStaffMode');document.getElementById('prodLogin')?.classList.remove('hide')}finally{restoring=false}}
+ setTimeout(restoreOnce,80);
+ /* 通常ログイン後は role を保存。submit 捕捉なので関数の置換なし */
+ document.getElementById('prodLogin')?.querySelector('button')?.addEventListener('click',()=>{setTimeout(()=>{if(prodRole==='admin')saveUI({role:'admin'});else if(prodRole==='staff')saveUI({role:'staff'})},250)},false);
 })();
 </script>
-<!-- ===== /v35 ===== -->
+<!-- ===== /v36 ===== -->
