@@ -11224,3 +11224,69 @@ body:not(.prodStaffMode) #prodAdminReqCalendar{width:100vw!important;max-width:1
 })();
 </script>
 <!-- ===== /v36 ===== -->
+
+<!-- ===== v37 calendar interaction / border / holiday-label fix ===== -->
+<style id="v37-calendar-fix">
+/* Empty calendar cells stay visually present so the grid lines never break. */
+#prodAdminReqCalendar .prodCalDay.out{
+  visibility:visible!important;
+  pointer-events:none!important;
+  background:#fff!important;
+}
+/* Only actual Sundays / holidays receive holiday tint; ordinary days stay white. */
+#prodAdminReqCalendar .prodCalDay:not(.sun):not(.holidayLike):not(.sat){background:#fff!important}
+/* Old holiday-label rules had a pink background; suppress it unless a real label exists. */
+#prodAdminReqCalendar .holidayName:empty{display:none!important;background:transparent!important;height:0!important;margin:0!important;padding:0!important}
+</style>
+<script id="v37-calendar-fix-script">
+(()=>{
+ 'use strict';
+ const oldRender=window.prodRenderAdminCalendar;
+ if(typeof oldRender==='function'){
+   window.prodRenderAdminCalendar=function(){
+     oldRender();
+     const host=document.getElementById('prodAdminReqCalendar');
+     if(!host)return;
+     /* Do not leave empty holiday strips in ordinary dates. */
+     host.querySelectorAll('.holidayName').forEach(el=>{if(!el.textContent.trim())el.remove()});
+     /* Use one delegated click path. This avoids inline-handler conflicts from older overrides. */
+     host.querySelectorAll('.prodCalDay:not(.out)').forEach(cell=>{
+       const inline=cell.getAttribute('onclick')||'';
+       const m=inline.match(/prodOpenDay36\('([^']+)'\)/);
+       if(!m)return;
+       cell.removeAttribute('onclick');
+       cell.dataset.v37Date=m[1];
+       cell.style.cursor='pointer';
+     });
+   };
+ }
+ const host=document.getElementById('prodAdminReqCalendar');
+ if(host&&!host.dataset.v37Click){
+   host.dataset.v37Click='1';
+   host.addEventListener('click',e=>{
+     const cell=e.target.closest?.('.prodCalDay[data-v37-date]');
+     if(!cell||!host.contains(cell))return;
+     e.preventDefault();e.stopPropagation();
+     if(typeof window.prodOpenDay36==='function')window.prodOpenDay36(cell.dataset.v37Date);
+   },false);
+ }
+ /* Day editing must remain available in either admin request-source mode. */
+ const previousOpen=window.prodOpenDay36;
+ if(typeof previousOpen==='function'){
+   window.prodOpenDay36=function(k){
+     const saved=window.prodAdminInputMode;
+     try{
+       /* v36's submitted-mode shortcut prevented the requested day editor from opening. */
+       if(saved==='submitted')window.prodAdminInputMode='manual';
+       return previousOpen(k);
+     }finally{
+       window.prodAdminInputMode=saved;
+     }
+   };
+   window.prodOpenDay30=window.prodOpenDayEditor=window.prodOpenDay36;
+ }
+ /* Re-render once so existing on-screen cells receive v37 bindings. */
+ if(typeof window.prodRenderAdminCalendar==='function')setTimeout(window.prodRenderAdminCalendar,0);
+})();
+</script>
+<!-- ===== /v37 ===== -->
