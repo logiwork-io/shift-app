@@ -11170,7 +11170,7 @@ body:not(.prodStaffMode) #prodAdminReqCalendar{width:100vw!important;max-width:1
      const adj=Number((window.prodDayAdjust||prodDayAdjust||{})[k]||0);
      cells.push(`<div class="prodCalDay ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" onclick="prodOpenDay36('${k}')"><div class="v36DayHead"><span class="dn">${n}</span>${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</div><div class="holidayName">${hn?E(hn):''}</div><div class="v36Names">${names.join('')}</div></div>`);
    }
-   while((first.getDay()+last.getDate())%7!==0)cells.push('<div class="prodCalDay out" aria-hidden="true"></div>');
+   while(cells.length%7!==0)cells.push('<div class="prodCalDay out" aria-hidden="true"></div>');
    const miss=window.prodAdminInputMode==='submitted'?`<div class="submittedNote" style="margin:8px 4px">未提出：${window.prodSubmissionStatus?.missing?.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';
    host.innerHTML=`<div class="v36Nav"><button class="sec" onclick="prodCalendarMove(-1)" aria-label="前月">‹</button><div class="v36Title" onclick="prodCalendarReset()">${y}年${m+1}月</div><button class="sec" onclick="prodCalendarMove(1)" aria-label="翌月">›</button></div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>${miss}`;
  };
