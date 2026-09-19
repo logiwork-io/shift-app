@@ -11290,3 +11290,99 @@ body:not(.prodStaffMode) #prodAdminReqCalendar{width:100vw!important;max-width:1
 })();
 </script>
 <!-- ===== /v37 ===== -->
+
+<!-- ===== v38 10-day closing calendar + direct day editing + event persistence ===== -->
+<style id="v38-period-calendar">
+#prodAdminReqCalendar .v38PeriodTitle{text-align:center;font-size:19px;font-weight:900;line-height:1.15}
+#prodAdminReqCalendar .v38PeriodSub{text-align:center;font-size:10px;color:#6e7f82;margin-top:2px}
+#prodAdminReqCalendar .prodCalDay.v38Outside{background:#f1f3f3!important;color:#a4acad!important;cursor:default!important}
+#prodAdminReqCalendar .prodCalDay.v38Outside .dn{color:#9ba4a5!important}
+#prodAdminReqCalendar .prodCalDay.v38Outside .holidayName{opacity:.55}
+#prodAdminReqCalendar .prodCalDay.v38Outside .v36Names{opacity:.45}
+#prodAdminReqCalendar .prodCalDay.v38Active{cursor:pointer!important;touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(0,166,166,.12)}
+#prodAdminReqCalendar .prodCalDay.v38Active:active{background:#eefafa!important}
+</style>
+<script id="v38-period-calendar-script">
+(()=>{
+ 'use strict';
+ const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const H=()=>staff.filter(s=>s.role==='ホール');
+ const K=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+ const periodStart=()=>{const v=document.getElementById('month')?.value;const d=v?new Date(v+'T00:00:00'):null;return d&&!Number.isNaN(d.getTime())?d:new Date(new Date().getFullYear(),new Date().getMonth(),11)};
+ const periodEnd=s=>{const e=new Date(s);e.setMonth(e.getMonth()+1);e.setDate(10);return e};
+ const fmt=d=>`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+ function movePeriod(delta){
+   const sel=document.getElementById('month');if(!sel)return;
+   const cur=periodStart(),n=new Date(cur);n.setMonth(n.getMonth()+Number(delta));n.setDate(11);const nk=K(n);
+   const opt=[...sel.options].find(o=>o.value===nk);if(!opt)return;
+   sel.value=nk;
+   if(typeof makeDates==='function')makeDates();
+   if(typeof renderAll==='function')renderAll();
+   try{sessionStorage.setItem('kadokura_ui_v36',JSON.stringify({...JSON.parse(sessionStorage.getItem('kadokura_ui_v36')||'{}'),targetMonth:nk,calendarMonth:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`}))}catch(_){ }
+   setTimeout(()=>window.prodRenderAdminCalendar?.(),0);
+ }
+ window.prodCalendarMove=movePeriod;
+ window.prodCalendarReset=()=>window.prodRenderAdminCalendar?.();
+
+ window.prodRenderAdminCalendar=function(){
+   const host=document.getElementById('prodAdminReqCalendar');if(!host)return;
+   const s=periodStart(),e=periodEnd(s);
+   // The visual grid starts on the 1st of the start month. Days 1-10 are the previous closing period and are shown grey.
+   const visualStart=new Date(s.getFullYear(),s.getMonth(),1);
+   const cells=[];
+   for(let i=0;i<visualStart.getDay();i++)cells.push('<div class="prodCalDay out v38Outside" aria-hidden="true"></div>');
+   // Continue through the closing date, then fill only to the end of that calendar week.
+   const visualEnd=addDays(e,(6-e.getDay()));
+   for(let d=new Date(visualStart);d<=visualEnd;d.setDate(d.getDate()+1)){
+     const k=K(d),w=d.getDay(),active=d>=s&&d<=e;
+     const hol=typeof prodHolidayLike==='function'&&prodHolidayLike(d),hn=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'';
+     const names=[];
+     for(const st of H()){
+       const r=typeof reqObj==='function'?reqObj(st.id,k):(requests?.[st.id]?.[k]||{});if(!r?.m)continue;
+       names.push(`<span class="v36Name ${st.input==='work'?'reqWork':'reqOff'}">${E(String(st.name).slice(0,3))}</span>`);if(names.length>=12)break;
+     }
+     const adj=Number((window.prodDayAdjust||window.prodDayAdjust===0?window.prodDayAdjust:(typeof prodDayAdjust!=='undefined'?prodDayAdjust:{}))?.[k]||0);
+     cells.push(`<div class="prodCalDay ${active?'v38Active':'v38Outside'} ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" ${active?`data-v38-date="${k}" role="button" tabindex="0"`:''}><div class="v36DayHead"><span class="dn">${d.getDate()===1&&d.getMonth()!==s.getMonth()?`${d.getMonth()+1}/1`:d.getDate()}</span>${active&&adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</div>${hn?`<div class="holidayName">${E(hn)}</div>`:''}<div class="v36Names">${names.join('')}</div></div>`);
+   }
+   const miss=window.prodAdminInputMode==='submitted'?`<div class="submittedNote" style="margin:8px 4px">未提出：${window.prodSubmissionStatus?.missing?.length?prodSubmissionStatus.missing.join('、'):'なし'}</div>`:'';
+   host.innerHTML=`<div class="v36Nav"><button type="button" class="sec" data-v38-move="-1" aria-label="前の締め期間">‹</button><div><div class="v38PeriodTitle">${fmt(s)}〜${fmt(e)}</div><div class="v38PeriodSub">11日〜翌月10日</div></div><button type="button" class="sec" data-v38-move="1" aria-label="次の締め期間">›</button></div><div class="prodCal"><div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>${cells.join('')}</div>${miss}`;
+   // Bind directly after every render. No inline onclick and no dependency on older delegated handlers.
+   host.querySelectorAll('[data-v38-date]').forEach(cell=>{
+     const open=()=>{const k=cell.dataset.v38Date;if(typeof window.prodOpenDay36==='function')window.prodOpenDay36(k);else if(typeof window.prodOpenDayEditor==='function')window.prodOpenDayEditor(k);};
+     cell.addEventListener('click',open,{passive:true});
+     cell.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();open();}});
+   });
+   host.querySelectorAll('[data-v38-move]').forEach(b=>b.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();movePeriod(Number(b.dataset.v38Move));}));
+ };
+
+ // Keep event data in the exact structures used by the generation engine: events[date] + eventAttend[date][employeeId].
+ // v36 already writes these on day-save; this guard normalizes the saved event and refreshes all dependent views immediately.
+ const save36=window.prodSaveDay36;
+ if(typeof save36==='function')window.prodSaveDay36=async function(){
+   const D=window.v36DayDraft?JSON.parse(JSON.stringify(window.v36DayDraft)):null;
+   await save36();
+   if(D?.k){
+     const k=D.k,n=String(D.event?.name||'').trim(),st=String(D.event?.start??'');
+     if(n||st)events[k]={name:n,memo:n,start:st,time:st,end:''}; else delete events[k];
+     const aa={};H().filter(x=>x.employment==='社員').forEach(x=>{if(D.att?.[x.id])aa[x.id]=true});
+     if(Object.keys(aa).length)eventAttend[k]=aa;else delete eventAttend[k];
+     try{quickSave()}catch(_){ }
+     try{if(typeof prodCloudSaveSilent==='function')await prodCloudSaveSilent()}catch(err){console.warn('event cloud save failed',err)}
+     if(typeof renderAll==='function')renderAll();
+     window.prodRenderAdminCalendar?.();
+   }
+ };
+ // Published staff preview must receive the same event/event-participant information.
+ window.prodPublish=async function(){
+   if(prodRole!=='admin')return;if(!confirm('現在の完成シフトをスタッフへ公開しますか？'))return;
+   try{
+     const pub={monthStart:document.getElementById('month').value,monthLabel:document.getElementById('month').selectedOptions?.[0]?.textContent||'',staff:staff.map(s=>({id:s.id,name:s.name,role:s.role})),schedule,dates:dates.map(d=>ymd(d)),events:JSON.parse(JSON.stringify(events||{})),eventAttend:JSON.parse(JSON.stringify(eventAttend||{}))};
+     await prodApi('publish',{published:pub});await prodCloudSaveSilent();alert('完成シフトを公開しました');
+   }catch(err){alert('公開に失敗しました: '+err.message)}
+ };
+ // Re-render with the 10-day-closing model now.
+ setTimeout(()=>window.prodRenderAdminCalendar?.(),0);
+})();
+</script>
+<!-- ===== /v38 ===== -->
