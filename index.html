@@ -10929,3 +10929,61 @@ body.prodStaffMode #prodRequestGrid{width:calc(100vw - 8px)!important;max-width:
 
 
 
+
+<!-- ===== v33 requested fixes: UI/state only; generation engine untouched ===== -->
+<style id="v33-requested-fixes">
+/* Explicit default state colors in admin day editor */
+#prodUnifiedModal .prodDayEditorRow .state.v33-work{background:#e8f3ff!important;color:#2f6597!important;border:1px solid #cfe2f5!important;border-radius:7px;padding:5px 6px;font-weight:800}
+#prodUnifiedModal .prodDayEditorRow .state.v33-off{background:#ffedf1!important;color:#9e4050!important;border:1px solid #f2d5dc!important;border-radius:7px;padding:5px 6px;font-weight:800}
+/* One-sheet preview: fit the whole month in the modal instead of horizontal scrolling */
+#preview.v33-staff-preview{display:flex!important}
+#preview .inner{width:min(98vw,1180px)!important;max-width:98vw!important;padding:12px!important}
+#preview #sheet{overflow:hidden!important;width:100%!important}
+#preview #sheet .pt{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important}
+#preview #sheet .pt th,#preview #sheet .pt td{min-width:0!important;width:auto!important;padding:2px 1px!important;font-size:clamp(6px,1.45vw,10px)!important;line-height:1.08!important;white-space:nowrap!important;overflow:hidden!important}
+#preview #sheet .pt th:first-child,#preview #sheet .pt td:first-child{width:15%!important;font-size:clamp(7px,1.7vw,11px)!important;font-weight:800!important}
+#preview #sheet .previewEvent{font-size:clamp(5px,1.15vw,8px)!important;line-height:1.05!important;white-space:normal!important;overflow-wrap:anywhere!important;min-width:0!important}
+body.prodStaffMode #preview.v33-staff-preview{display:flex!important;z-index:99999!important}
+</style>
+<script id="v33-requested-fixes-script">
+(()=>{
+ const CP=x=>JSON.parse(JSON.stringify(x||{}));
+ const H=()=>staff.filter(s=>s.role==='ホール');
+ const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const W='日月火水木金土';
+ const reqDefault=s=>s?.input==='work'?{m:'×',ts:'',te:''}:{m:'○',ts:'',te:''};
+ const reqEffective=(s,r)=>r&&r.m?r:reqDefault(s);
+ const timeText=r=>{const a=r?.ts??(r?.d==='from'?r?.h:'')??'',b=r?.te??r?.end??(r?.d==='until'?r?.h:'')??'';return a&&b?`${a}〜${b}`:a?`${a}〜`:b?`〜${b}`:''};
+ const timeOpts=v=>'<option value="">－</option>'+Array.from({length:16},(_,i)=>i+9).map(h=>`<option value="${h}" ${String(v??'')===String(h)?'selected':''}>${h}時</option>`).join('');
+ function modal(){return document.getElementById('prodUnifiedModal')}
+ function setHead(){const h=modal()?.querySelector('.prodModalHead');if(!h)return;h.querySelectorAll('.prodModalClose,.prodModalHeadActions').forEach(x=>x.remove());const a=document.createElement('div');a.className='prodModalHeadActions';a.innerHTML='<button class="prodModalSave" onclick="prodSaveDay33()">保存</button><button class="sec" onclick="prodCloseDay33()">閉じる</button>';h.appendChild(a)}
+ function ev(k){const x=events?.[k];return x&&typeof x==='object'?{name:String(x.name??x.memo??''),start:String(x.start??'')}:{name:typeof x==='string'?x:'',start:''}}
+ window.prodOpenDayEditor=window.prodOpenDay30=function(k){
+   if(window.prodAdminInputMode==='submitted'&&typeof prodOpenDayPicker==='function')return prodOpenDayPicker(k);
+   const d=new Date(k+'T00:00:00'),x=ev(k);window.v33DayDraft={k,adj:Number((window.prodDayAdjust||prodDayAdjust||{})[k]||0),rows:{},event:x,att:{...(eventAttend?.[k]||{})}};
+   H().forEach(s=>{const raw=typeof reqObj==='function'?reqObj(s.id,k):(requests?.[s.id]?.[k]||{});v33DayDraft.rows[s.id]=CP(raw?.m?raw:reqDefault(s))});
+   document.getElementById('prodUnifiedTitle').textContent=`${d.getMonth()+1}月${d.getDate()}日（${W[d.getDay()]}）`;render33();setHead();modal().classList.remove('hide');
+ };
+ function render33(){const D=v33DayDraft,emps=H().filter(s=>s.employment==='社員').map(s=>`<label><input type="checkbox" ${D.att[s.id]?'checked':''} onchange="v33DayDraft.att['${s.id}']=this.checked">${E(s.name)}</label>`).join('');
+   const rows=H().map(s=>{const r=reqEffective(s,D.rows[s.id]),tm=timeText(r),state=tm?'出勤':r.m==='△'?'でき休':r.m==='有給'?'有給':r.m==='×'?'休み':'出勤',cls=state==='休み'||state==='でき休'?'v33-off':'v33-work',a=r.ts??(r.d==='from'?r.h:'')??'',b=r.te??r.end??(r.d==='until'?r.h:'')??'';return `<div class="prodDayEditorRow"><button class="nm sec" onclick="v33Toggle('${s.id}')">${E(s.name)}</button><div class="state ${cls}">${state}</div><select onchange="v33Time('${s.id}','ts',this.value)">${timeOpts(a)}</select><span>〜</span><select onchange="v33Time('${s.id}','te',this.value)">${timeOpts(b)}</select></div>`}).join('');
+   document.getElementById('prodUnifiedBody').innerHTML=`<div class="prodAdjLine"><b>人数補正</b><select onchange="v33DayDraft.adj=Number(this.value)">${[-2,-1,0,1,2].map(v=>`<option value="${v}" ${v===D.adj?'selected':''}>${v>0?'+':''}${v}</option>`).join('')}</select></div><div class="prodEventEditor"><div class="prodEventTitle">イベント</div><div class="prodEventLine"><input value="${E(D.event.name)}" placeholder="イベント名" oninput="v33DayDraft.event.name=this.value"><select onchange="v33DayDraft.event.start=this.value">${timeOpts(D.event.start)}</select><button class="sec" onclick="this.parentNode.nextElementSibling.classList.toggle('hide')">参加者</button></div><div class="prodEventParticipants hide">${emps}</div></div><div class="prodDayEditorRows">${rows}</div>`;
+ }
+ window.v33Toggle=id=>{const s=H().find(x=>String(x.id)===String(id)),r=reqEffective(s,v33DayDraft.rows[id]);v33DayDraft.rows[id]=r.m==='×'?{m:'○',ts:'',te:''}:{m:'×',ts:'',te:''};render33()};
+ window.v33Time=(id,key,v)=>{const s=H().find(x=>String(x.id)===String(id)),r=v33DayDraft.rows[id]||(v33DayDraft.rows[id]=reqDefault(s));r[key]=v;if(r.ts||r.te)r.m='時間';else r.m=reqDefault(s).m;render33()};
+ window.prodCloseDay33=()=>{window.v33DayDraft=null;modal().classList.add('hide')};
+ window.prodSaveDay33=async()=>{const D=v33DayDraft;if(!D)return;const k=D.k;H().forEach(s=>{requests[s.id]??={};requests[s.id][k]=CP(D.rows[s.id]||reqDefault(s))});prodDayAdjust??={};prodDayAdjust[k]=Number(D.adj||0);window.prodDayAdjust=prodDayAdjust;events[k]={name:D.event.name,memo:D.event.name,start:D.event.start,end:''};eventAttend[k]={};H().filter(s=>s.employment==='社員').forEach(s=>{if(D.att[s.id])eventAttend[k][s.id]=true});localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(prodDayAdjust));quickSave();if(typeof prodCloudSaveSilent==='function'){try{await prodCloudSaveSilent()}catch(e){console.warn('cloud save failed',e)}}window.v33DayDraft=null;modal().classList.add('hide');if(typeof prodRenderAdminCalendar==='function')prodRenderAdminCalendar();};
+ // Cloud state must contain day adjustment; restore it on load as well.
+ window.prodState=function(){return {staff,requests,schedule,actual,events,eventAttend,prodDayAdjust:CP(window.prodDayAdjust||prodDayAdjust||{}),monthStart:document.getElementById('month').value}};
+ const oldCloudLoad=window.prodCloudLoad;window.prodCloudLoad=async function(){if(prodRole!=='admin')return;const j=await prodApi('admin_load');if(j.state&&Object.keys(j.state).length){applyDataObject(j.state);if(j.state.prodDayAdjust){prodDayAdjust=CP(j.state.prodDayAdjust);window.prodDayAdjust=prodDayAdjust;localStorage.setItem('kadokura_day_adjust_v23',JSON.stringify(prodDayAdjust))}if(j.state.monthStart&&[...document.getElementById('month').options].some(o=>o.value===j.state.monthStart))document.getElementById('month').value=j.state.monthStart;makeDates();renderAll();if(typeof prodRenderAdminCalendar==='function')prodRenderAdminCalendar()}};
+ // Month selector: always rebuild the admin request calendar after the period changes.
+ const monthSel=document.getElementById('month');if(monthSel&&!monthSel.dataset.v33Bound){monthSel.dataset.v33Bound='1';monthSel.addEventListener('change',()=>{makeDates();renderAll();if(typeof prodRenderAdminCalendar==='function')prodRenderAdminCalendar()})}
+ // Staff request calendar: blank means the mode's default, never "未入力".
+ const oldReqRender=window.prodRenderRequestForm;window.prodRenderRequestForm=function(){oldReqRender();const def=(window.prodStaffInputMode||'off')==='work'?'休み':'出勤';document.querySelectorAll('#prodRequestGrid .prodCalDay').forEach(cell=>{if(cell.classList.contains('out'))return;let s=cell.querySelector('.prodReqSummary');if(!s){s=document.createElement('div');s.className='prodReqSummary';cell.appendChild(s)}if(!s.textContent.trim()||s.textContent.trim()==='未入力')s.textContent=def;s.classList.toggle('v33-off',def==='休み');s.classList.toggle('v33-work',def==='出勤')})};
+ function pubEvent(p,k){const x=p.events?.[k];if(!x)return'';const n=typeof x==='object'?(x.name??x.memo??''):x,st=typeof x==='object'?(x.start??''):'';return [n,st!==''?`${st}時`:''].filter(Boolean).join(' ')}
+ function table(p){if(!p?.dates?.length||!p?.staff)return'<tr><td>まだシフトは公開されていません</td></tr>';const hs=p.staff.filter(s=>s.role==='ホール'),evr='<tr><th></th>'+p.dates.map(k=>`<th><div class="previewEvent">${E(pubEvent(p,k))}</div></th>`).join('')+'</tr>',hdr='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${W[d.getDay()]}</th>`}).join('')+'</tr>',rows=hs.map(s=>'<tr><td>'+E(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id],ck=q&&p.eventAttend?.[k]?.[s.id]?' ✓':'';return `<td>${q?E(q.label??q.start)+ck:'／'}</td>`}).join('')+'</tr>').join('');return evr+hdr+rows}
+ function showSheet(title,p,staffMode){const sh=document.getElementById('sheet'),pv=document.getElementById('preview');sh.innerHTML=`<div class="miniTitle">${E(title)} ホールシフト</div><table class="pt">${table(p)}</table>`;pv.classList.toggle('v33-staff-preview',!!staffMode);pv.classList.remove('hide')}
+ window.renderPreview=function(){showSheet(document.getElementById('month').selectedOptions[0].textContent,{dates:dates.map(d=>ymd(d)),staff:H(),schedule,events,eventAttend},false)};
+ window.prodShiftView=function(v){const m=document.getElementById('prodMonthShift'),d=document.getElementById('prodDailyShift'),p=document.getElementById('prodPreviewShift');if(v==='preview'){if(m)m.classList.add('hide');if(d)d.classList.add('hide');if(p)p.classList.add('hide');const pub=prodBoot?.published||{};showSheet(pub.monthStart?`${pub.monthStart.replace(/-/g,'/')}〜`: '公開済み',pub,true);return}if(document.getElementById('preview'))document.getElementById('preview').classList.remove('v33-staff-preview');if(m)m.classList.toggle('hide',v!=='month');if(d)d.classList.toggle('hide',v!=='daily');if(p)p.classList.add('hide');if(v==='daily'){const s=document.getElementById('prodDailyDate');if(s?.value)prodRenderDailyShift(s.value)}};
+ const oldClose=window.closePreview;window.closePreview=function(){document.getElementById('preview')?.classList.remove('v33-staff-preview');document.getElementById('preview')?.classList.add('hide')};
+})();
+</script>
