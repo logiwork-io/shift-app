@@ -11629,3 +11629,48 @@ setTimeout(()=>{window.prodRenderAdminCalendar?.();if(staffId())window.prodRende
 }
 </style>
 <!-- ===== /v42 ===== -->
+
+
+<script id="v245-generation-stable">
+// ===== v245 generation only: restore stable v243 baseline + conservative weekday buffer =====
+(()=>{
+  'use strict';
+  const BASE=window.v243AutoHall;
+  if(typeof BASE!=='function') return;
+  const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール');
+  const CAT=s=>staffCategory(s), EMP=s=>s.employment==='社員', STU=s=>CAT(s)==='バイト 学生', FREE=s=>['バイト 遅番','バイト フリー'].includes(CAT(s));
+  const R=(s,d)=>requests?.[s.id]?.[K(d)]||{}, SH=(s,d)=>schedule?.[K(d)]?.[s.id]||null;
+  const hard=(s,d)=>['×','有給'].includes(R(s,d).m), soft=(s,d)=>R(s,d).m==='△';
+  const requested=(s,d)=>['○','時間'].includes(R(s,d).m);
+  const active=(d,h)=>H().filter(s=>{const p=SH(s,d);return p&&Number(p.start)<=h&&Number(p.end)>h;});
+  function maxRunIfAdd(s,d){let i=dates.findIndex(x=>K(x)===K(d)),n=1;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)n++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)n++;return n;}
+  function available(s,d){if(EMP(s)||hard(s,d)||soft(s,d)||SH(s,d))return false;if(s.weekend===false&&isWeekend(d))return false;if(STU(s)&&!requested(s,d))return false;if(s.input==='work'&&!requested(s,d))return false;return maxRunIfAdd(s,d)<=Number(s.max||6);}
+  function requestedRange(s,d){const r=R(s,d);if(r.m!=='時間')return null;let st=r.ts!==undefined&&r.ts!==''?Number(r.ts):(r.d==='from'&&r.h!==''?Number(r.h):null);let en=r.te!==undefined&&r.te!==''?Number(r.te):(r.d==='until'&&r.h!==''?Number(r.h):null);return {st,en};}
+  function patterns(s,d){const c=closeHour(d),rr=requestedRange(s,d),bs=Number(s.bs||17),be=Number(s.be||c),out=[];
+    if(rr){let st=rr.st??Math.max(13,bs),en=rr.en??Math.min(c,st+9,be||c);if(en>st&&st>=13)out.push([st,Math.min(en,st+9,c)]);return out;}
+    const min=Math.max(13,Number.isFinite(bs)?bs:13);for(const st of [13,14,16,17]){if(st<min||st>=c)continue;let en=Math.min(c,Number.isFinite(be)&&be>st?be:c,st+9);if(en-st>=4)out.push([st,en]);}return out;
+  }
+  function scorePattern(d,p){let gain=0,over=0;for(let h=Math.floor(p[0]);h<Math.ceil(p[1]);h++){if(h<13||h>=closeHour(d))continue;const n=active(d,h).length;if(h<20){if(n<5)gain+=(5-n)*8;else if(n===5)gain+=1;if(n>=6)over+=(n-5)*10;}else{if(n<4)gain+=(4-n)*5;if(n>=5)over+=(n-4)*8;}}return gain-over;}
+  function weekdayComfortBuffer(){
+    for(const d of dates){if(isWeekend(d))continue;
+      // 9〜11時は増やさない。13時以降に「あと1人いると余裕が出る日」だけ最大1人戻す。
+      const need=[13,14,15,16,17,18,19].some(h=>h<closeHour(d)&&active(d,h).length<5);if(!need)continue;
+      let best=null;for(const s of H().filter(x=>(FREE(x)||STU(x))&&available(x,d))){for(const p of patterns(s,d)){const sc=scorePattern(d,p);if(sc<=0)continue;if(!best||sc>best.sc)best={s,p,sc};}}
+      if(best){schedule[K(d)]??={};schedule[K(d)][best.s.id]={label:String(best.p[0]),start:best.p[0],end:best.p[1]};}
+    }
+  }
+  function validate245(){const out=[];for(const d of dates){
+    const k=K(d),c=closeHour(d),n9=H().filter(s=>SH(s,d)?.start===9).length;if(n9!==1)out.push(`${k}:9時入り${n9}人`);
+    const starts11=H().filter(s=>SH(s,d)?.start===11).length;if(isWeekend(d)&&starts11>4)out.push(`${k}:11時開始${starts11}人（最大4人）`);
+    for(let h=12;h<c;h++){const n=active(d,h).length;if(isWeekend(d)&&n>7)out.push(`${k}:${h}時${n}人（最大7人）`);}
+    for(const e of H().filter(EMP)){const p=SH(e,d);if(p&&Number(p.start)>13)out.push(`${k}:${e.name} 社員${p.start}時入り`);if(R(e,d).m==='有給'&&p)out.push(`${k}:${e.name} 有給日に出勤`);if(eventAttend?.[k]?.[e.id]&&!p)out.push(`${k}:${e.name} イベント参加なのに非出勤`);}
+    for(const s of H()){if(hard(s,d)&&SH(s,d))out.push(`${k}:${s.name} 休み希望日に出勤`);const r=R(s,d),p=SH(s,d);if(r.m==='時間'&&p){const rr=requestedRange(s,d);if(rr?.st!=null&&Number(p.start)<rr.st)out.push(`${k}:${s.name} 希望開始時刻より前`);if(rr?.en!=null&&Number(p.end)>rr.en)out.push(`${k}:${s.name} 希望終了時刻より後`);}}
+  }
+  for(const e of H().filter(EMP)){const off=dates.filter(d=>!SH(e,d)&&R(e,d).m!=='有給').length;if(off!==8)out.push(`${e.name}:公休${off}日`);}
+  return [...new Set(out)];}
+  window.v245AutoHall=function(){const real=window.alert;window.alert=()=>{};try{BASE();weekdayComfortBuffer();}catch(e){console.error(e);real('自動生成中にエラーが発生しました: '+e.message);return;}finally{window.alert=real;}window.v245Issues=[...new Set([...(window.v243Validate?window.v243Validate():[]),...validate245()])];quickSave();renderAll();real(window.v245Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v245Issues.length}件`:'ホールの自動生成をしました');};
+  window.v245Validate=()=>[...new Set([...(window.v243Validate?window.v243Validate():[]),...validate245()])];
+  window.autoMake=window.v245AutoHall;window.v62AutoMake=window.autoMake;
+})();
+// ===== /v245 =====
+</script>
