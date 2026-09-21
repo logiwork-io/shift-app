@@ -11561,3 +11561,71 @@ setTimeout(()=>{window.prodRenderAdminCalendar?.();if(staffId())window.prodRende
 })();
 </script>
 <!-- ===== /v41 ===== -->
+
+<!-- ===== v42 staff calendar visual alignment only ===== -->
+<style id="v42-staff-calendar-visual">
+/* Keep interaction/data code untouched. Only align the staff calendar visuals with admin. */
+#prodRequestMonth{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}
+#prodRequestMonth .v36Nav{
+  width:100%!important;
+  display:grid!important;
+  grid-template-columns:56px minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:6px 0 10px!important;
+}
+#prodRequestMonth .v36Nav>button{
+  width:56px!important;height:52px!important;min-width:56px!important;
+  margin:0!important;padding:0!important;align-self:center!important;
+}
+#prodRequestMonth .v36Nav>div{min-width:0!important;text-align:center!important;}
+#prodRequestMonth .v39PeriodTitle{
+  margin:0!important;font-size:19px!important;line-height:1.2!important;
+  white-space:nowrap!important;text-align:center!important;
+}
+#prodRequestMonth .v39PeriodSub{margin-top:3px!important;text-align:center!important;}
+
+/* Holiday presentation: same compact red label used by the admin calendar. */
+#prodRequestGrid .holidayName{
+  display:block!important;
+  width:calc(100% - 8px)!important;
+  margin:3px 4px 2px!important;
+  padding:2px 4px!important;
+  border-radius:4px!important;
+  background:#ffe3e8!important;
+  color:#b23850!important;
+  font-size:9px!important;
+  font-weight:800!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+/* Request state colors: work = blue, off = red. */
+#prodRequestGrid .prodReqSummary{
+  display:block!important;
+  width:calc(100% - 8px)!important;
+  margin:4px 4px 0!important;
+  padding:3px 3px!important;
+  border-radius:999px!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  line-height:1.15!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+#prodRequestGrid .prodReqSummary.v33-work{
+  background:#e8f3ff!important;color:#2f6597!important;
+}
+#prodRequestGrid .prodReqSummary.v33-off{
+  background:#ffedf1!important;color:#9e4050!important;
+}
+@media(max-width:430px){
+  #prodRequestMonth .v36Nav{grid-template-columns:52px minmax(0,1fr) 52px!important;gap:6px!important;}
+  #prodRequestMonth .v36Nav>button{width:52px!important;min-width:52px!important;height:48px!important;}
+  #prodRequestMonth .v39PeriodTitle{font-size:18px!important;}
+}
+</style>
+<!-- ===== /v42 ===== -->
