@@ -11503,3 +11503,61 @@ setTimeout(()=>{window.prodRenderAdminCalendar?.();if(document.getElementById('p
 })();
 </script>
 <!-- ===== /v39 ===== -->
+
+<!-- ===== v41 final calendar interaction + date-label fix ===== -->
+<style id="v41-calendar-fix">
+#prodAdminReqCalendar .v41Day,#prodRequestGrid .v41Day{
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  position:relative!important;
+  z-index:1!important;
+  -webkit-tap-highlight-color:rgba(0,166,166,.14)!important;
+}
+#prodAdminReqCalendar .v41Day:active,#prodRequestGrid .v41Day:active{background:#eefafa!important}
+</style>
+<script id="v41-calendar-fix-script">
+(()=>{
+'use strict';
+const pad=n=>String(n).padStart(2,'0');
+const key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse=s=>new Date(String(s)+'T00:00:00');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hall=()=>staff.filter(s=>s.role==='ホール');
+const periodEnd=s=>new Date(s.getFullYear(),s.getMonth()+1,10);
+const periodDays=(s,e)=>{const a=[];for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1))a.push(new Date(d));return a};
+const heads=()=>'<div class="prodCalHead">日</div><div class="prodCalHead">月</div><div class="prodCalHead">火</div><div class="prodCalHead">水</div><div class="prodCalHead">木</div><div class="prodCalHead">金</div><div class="prodCalHead">土</div>';
+const label=d=>d.getDate()===1?`${d.getMonth()+1}/1`:String(d.getDate());
+const fmt=d=>`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+function grid(ds,render){const a=[];for(let i=0;i<ds[0].getDay();i++)a.push('<div class="prodCalDay out" aria-hidden="true"></div>');for(const d of ds)a.push(render(d));while(a.length%7)a.push('<div class="prodCalDay out" aria-hidden="true"></div>');return a.join('')}
+function adminStart(){const v=document.getElementById('month')?.value,d=v?parse(v):new Date();return Number.isNaN(d.getTime())?new Date(new Date().getFullYear(),new Date().getMonth(),11):d}
+function nav(s,kind){const e=periodEnd(s);return `<div class="v36Nav"><button type="button" class="sec v41Move" data-v41-kind="${kind}" data-v41-delta="-1">‹</button><div><div class="v39PeriodTitle">${fmt(s)}〜${fmt(e)}</div><div class="v39PeriodSub">11日〜翌月10日</div></div><button type="button" class="sec v41Move" data-v41-kind="${kind}" data-v41-delta="1">›</button></div>`}
+window.prodRenderAdminCalendar=function(){
+ const host=document.getElementById('prodAdminReqCalendar');if(!host)return;
+ const s=adminStart(),e=periodEnd(s),ds=periodDays(s,e);
+ const cells=grid(ds,d=>{const k=key(d),w=d.getDay(),hol=typeof prodHolidayLike==='function'&&prodHolidayLike(d),hn=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'',adj=Number((window.prodDayAdjust||{})[k]||0),names=[];for(const st of hall()){const r=requests?.[st.id]?.[k]||{};if(!r.m)continue;names.push(`<span class="v36Name ${st.input==='work'?'reqWork':'reqOff'}">${esc(String(st.name).slice(0,3))}</span>`);if(names.length>=12)break}return `<div class="prodCalDay v41Day ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" data-v41-admin="${k}" role="button" tabindex="0"><div class="v36DayHead"><span class="dn">${label(d)}</span>${adj?`<span class="prodDayAdjBadge">${adj>0?'+':''}${adj}</span>`:''}</div>${hn?`<div class="holidayName">${esc(hn)}</div>`:''}<div class="v36Names">${names.join('')}</div></div>`});
+ host.innerHTML=nav(s,'admin')+`<div class="prodCal">${heads()}${cells}</div>`;
+};
+function staffId(){return document.getElementById('prodStaffName')?.value||''}
+function staffStart(){const raw=window.v40StaffPeriod||prodBoot?.monthStart||'';return raw?parse(raw):null}
+window.prodRenderRequestForm=function(){
+ const m=document.getElementById('prodRequestMonth'),g=document.getElementById('prodRequestGrid');if(!m||!g||!staffId())return;
+ const s=staffStart();if(!s||Number.isNaN(s.getTime())){m.textContent='管理者が対象月を設定すると入力できます';g.innerHTML='';return}
+ const e=periodEnd(s),ds=periodDays(s,e),mode=window.prodStaffInputMode||'off',dv=mode==='work'?'休み':'出勤';
+ m.innerHTML=nav(s,'staff');
+ const cells=grid(ds,d=>{const k=key(d),w=d.getDay(),r=window.prodStaffDraft?.[k]||{},hol=typeof prodHolidayLike==='function'&&prodHolidayLike(d),hn=typeof prodHolidayLabel==='function'?prodHolidayLabel(d):'',txt=r.m==='×'?'休み':r.m==='△'?'できれば休み':r.m==='○'?'出勤':r.m==='有給'?'有給':r.m==='時間'?`${r.ts??r.h??''}〜${r.te??r.end??''}`:dv;return `<div class="prodCalDay v41Day ${w===0?'sun ':w===6?'sat ':''}${hol?'holidayLike ':''}" data-v41-staff="${k}" role="button" tabindex="0"><div class="dn">${label(d)}</div>${hn?`<div class="holidayName">${esc(hn)}</div>`:''}<div class="prodReqSummary ${txt==='休み'?'v33-off':'v33-work'}">${esc(txt)}</div></div>`});
+ g.innerHTML=`<div class="prodCal">${heads()}${cells}</div>`;
+};
+function activate(el){
+ if(el.matches('[data-v41-admin]')){if(typeof window.v40OpenAdmin==='function')window.v40OpenAdmin(el.dataset.v41Admin);return true}
+ if(el.matches('[data-v41-staff]')){if(typeof window.v40OpenStaff==='function')window.v40OpenStaff(el.dataset.v41Staff);return true}
+ if(el.matches('.v41Move')){const kind=el.dataset.v41Kind,delta=Number(el.dataset.v41Delta);if(typeof window.v40Move==='function')window.v40Move(kind,delta);return true}
+ return false;
+}
+/* Capture phase: this runs before all older calendar click handlers. */
+document.addEventListener('click',e=>{const el=e.target.closest?.('[data-v41-admin],[data-v41-staff],.v41Move');if(!el)return;e.preventDefault();e.stopImmediatePropagation();activate(el)},true);
+document.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const el=e.target.closest?.('[data-v41-admin],[data-v41-staff]');if(!el)return;e.preventDefault();e.stopImmediatePropagation();activate(el)},true);
+setTimeout(()=>{window.prodRenderAdminCalendar?.();if(staffId())window.prodRenderRequestForm?.()},0);
+})();
+</script>
+<!-- ===== /v41 ===== -->
