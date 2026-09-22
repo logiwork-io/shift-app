@@ -11636,12 +11636,13 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
     for(const d of dates){for(const s of H()){if(SH(s,d)&&!dayAvailable(s,d))delete schedule[K(d)][s.id];}}
   }
   function setupRunIfAssigned(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
+  function runIfAdded(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
   function setupCount(s){return dates.filter(d=>Number(SH(s,d)?.start)===9).length;}
   function rebalanceSetupFinal(){
     for(const d of dates){let k=K(d);
       let current=H().filter(s=>Number(SH(s,d)?.start)===9&&SET(s));
       let candidates=H().filter(s=>EAR(s)&&SET(s)&&dayAvailable(s,d)&&Number(s.bs||99)<=9);
-      candidates=candidates.filter(s=>setupRunIfAssigned(s,d)<=Number(s.max||5)||SH(s,d));
+      candidates=candidates.filter(s=>SH(s,d)?setupRunIfAssigned(s,d)<=Number(s.max||5):runIfAdded(s,d)<=Number(s.max||5));
       if(!candidates.length)continue;
       candidates.sort((a,b)=>setupCount(a)-setupCount(b)||dates.filter(x=>SH(a,x)).length-dates.filter(x=>SH(b,x)).length);
       let pick=candidates[0];
@@ -11729,6 +11730,42 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
       }
     }
   }
+  function repairFixedAndRequestedTimes(){
+    for(const d of dates){let k=K(d);for(const s of H()){let p=SH(s,d);if(!p)continue;
+      if(!dayAvailable(s,d)){delete schedule[k][s.id];continue;}
+      let rr=reqRange(s,d),fs=fixedStart(s,d),st=Number(p.start),en=Number(p.end),mode=MODE(s);
+      if(fs!=null&&st!==fs)st=fs;
+      if(rr?.st!=null)st=Math.max(st,rr.st);
+      if(rr?.en!=null)en=Math.min(en,rr.en);
+      if(mode==='時間固定'){st=Number(s.bs);en=Number(s.be);}
+      else if(mode==='退勤固定')en=Number(s.be);
+      if(EMP(s)&&st>13){delete schedule[k][s.id];continue;}
+      if(en-st>9)en=st+9;
+      let np={...p,label:String(st),start:st,end:en};
+      if(en<=st||!allowed(s,d,np))delete schedule[k][s.id];else schedule[k][s.id]=np;
+    }}
+  }
+  function lateCandidatePattern(s,d){
+    if(!dayAvailable(s,d)||EMP(s)||EAR(s))return null;
+    let c=closeHour(d),rr=reqRange(s,d),mode=MODE(s),st,en;
+    if(rr?.st!=null)st=rr.st;else if(['時間固定','出勤固定'].includes(mode))st=Number(s.bs);else st=Math.max(17,Number(s.bs||17));
+    if(vFinalHolidayLike(d)&&s.otherMode==='土日祝'&&s.os!==''&&s.os!=null&&!['時間固定','出勤固定'].includes(mode))st=Math.max(11,Number(s.os));
+    if(rr?.en!=null)en=rr.en;else if(['時間固定','退勤固定'].includes(mode))en=Number(s.be);else en=Math.min(c,Number(s.be||c),st+9);
+    en=Math.min(c,en,st+9);let p={label:String(st),start:st,end:en};return en>st&&allowed(s,d,p)?p:null;
+  }
+  function restoreLateCoverage(){
+    for(const d of dates){let k=K(d),c=closeHour(d);if(c<=18)continue;
+      let target=5;
+      let need=()=>Math.max(0,...[18,19,20,21].filter(h=>h<c).map(h=>target-activeCount(d,h)));
+      let guard=0;while(need()>0&&guard++<20){
+        let cand=H().filter(s=>!SH(s,d)&&dayAvailable(s,d)&&!EMP(s)&&!EAR(s)).map(s=>({s,p:lateCandidatePattern(s,d)})).filter(x=>x.p);
+        cand=cand.filter(x=>runIfAdded(x.s,d)<=Number(x.s.max||5));
+        cand.sort((a,b)=>{let aw=dates.filter(x=>SH(a.s,x)).length,bw=dates.filter(x=>SH(b.s,x)).length;let ar=({S:5,A:4,B:3,C:2,D:1,E:0}[a.s.rank]??1)-((a.s.skills||[]).includes('新人')?1:0),br=({S:5,A:4,B:3,C:2,D:1,E:0}[b.s.rank]??1)-((b.s.skills||[]).includes('新人')?1:0);return aw-bw||br-ar;});
+        let pick=cand.find(x=>[18,19,20,21].some(h=>h<c&&x.p.start<=h&&x.p.end>h&&activeCount(d,h)<target));
+        if(!pick)break;schedule[k]??={};schedule[k][pick.s.id]=pick.p;
+      }
+    }
+  }
   function finalIssues(){
     let out=[];
     for(const d of dates){let k=K(d),nines=H().filter(s=>Number(SH(s,d)?.start)===9);
@@ -11754,27 +11791,24 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   }
   // Final process controller. v244 remains the generator; this controller only fixes the execution order
   // of the final-process gates. Do not add person-name rules here.
-  function processAbsoluteGate(){ removeUnavailableAssignments(); }
+  function processAbsoluteGate(){ removeUnavailableAssignments(); repairFixedAndRequestedTimes(); }
   function processOpeningGate(){ for(const d of dates) normalizeOpening(d); rebalanceSetupFinal(); }
   function processRunGate(){ repairMaxRuns(); }
   function processRoleGate(){ repairEarlyRoleStarts(); }
-  function processFinalNormalize(){ removeUnavailableAssignments(); for(const d of dates) normalizeOpening(d); }
+  function processFinalNormalize(){ removeUnavailableAssignments(); repairFixedAndRequestedTimes(); for(const d of dates) normalizeOpening(d); }
   function runFinalProcessCycle(){
-    // 1-2 希望解釈・絶対条件 are re-applied first after the v244 base generation.
+    // v244 result is repaired in the agreed process order; hard constraints always win.
     processAbsoluteGate();
-    // 3 社員公休: move auto-created weekend/holiday rests to weekdays whenever a valid swap exists.
     repairWeekendEmployeeOffsFinal();
-    // 4 イベント is generated by the v244 base and protected by final validation.
-    // 5-6 9時/早番・昼帯
+    // Break overlong runs BEFORE assigning the 9:00 role so opening repair cannot hide a max-run violation.
+    processRunGate();
     processOpeningGate();
     processRoleGate();
-    // 7-12 フリー/学生/平休日/人数補正/できれば休み are kept from v244; do not trim here.
-    // 13 月間バランスのうち最大連勤を先に修復
+    // Preserve useful late/student staffing after early staffing has been settled.
+    restoreLateCoverage();
     processRunGate();
-    // A run repair can change employee/off-day balance and can remove the 9:00 worker.
     repairWeekendEmployeeOffsFinal();
     processOpeningGate();
-    // Re-check absolute availability because no repair is allowed to revive an unavailable day.
     processAbsoluteGate();
     processFinalNormalize();
   }
