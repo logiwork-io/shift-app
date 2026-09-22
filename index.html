@@ -524,8 +524,6 @@ let staff=[
 {id:'a',name:'a',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'b',name:'b',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
 {id:'c',name:'c',input:'off',role:'ホール',employment:'社員',rank:'A',skills:[],bs:13,be:22,os:'',oe:'',weekend:true,half:false,close:false,set:false,max:5},
-{id:'d',name:'d',input:'off',role:'調理場',employment:'バイト',rank:'B',skills:['仕込み'],bs:9,be:18,os:'',oe:'',weekend:true,half:false,close:false,set:true,max:5},
-{id:'e',name:'e',input:'off',role:'調理場',employment:'バイト',rank:'B',skills:['仕込み'],bs:11,be:20,os:'',oe:'',weekend:true,half:false,close:false,set:true,max:5},
 {id:'f',name:'f',input:'off',role:'ホール',employment:'バイト',rank:'B',skills:['ドリバ'],bs:9,be:17,os:'',oe:'',weekend:false,half:false,close:false,set:false,max:5},
 {id:'g',name:'g',input:'off',role:'ホール',employment:'バイト',rank:'C',skills:['新人'],bs:9,be:16,os:'',oe:'',weekend:false,half:true,close:false,set:false,max:5},
 {id:'h',name:'h',input:'off',role:'ホール',employment:'バイト',rank:'A',skills:[],bs:15,be:22,os:'',oe:'',weekend:true,half:false,close:true,set:false,max:4},
@@ -597,6 +595,13 @@ function findLatestSavedData(){
 
 function applyDataObject(d){
   if(d.staff) staff=d.staff;
+  // Dedicated kitchen-person records are obsolete. Skills remain on normal staff.
+  const removedIds=new Set((staff||[]).filter(s=>s&&s.role==='調理場').map(s=>String(s.id)));
+  staff=(staff||[]).filter(s=>s&&s.role!=='調理場').map(s=>({...s,role:'ホール'}));
+  if(removedIds.size){
+    for(const id of removedIds) delete (d.requests||{})[id];
+    for(const box of [d.schedule||{},d.actual||{},d.eventAttend||{}]) for(const k of Object.keys(box)) for(const id of removedIds) if(box[k]&&typeof box[k]==='object') delete box[k][id];
+  }
   staff.forEach(s=>{
     if(s.os===undefined) s.os='';
     if(s.oe===undefined) s.oe='';
@@ -628,10 +633,11 @@ function loadData(){
 }
 
 function saveData(){
+  staff=(staff||[]).filter(s=>s&&s.role!=='調理場').map(s=>({...s,role:'ホール'}));
   localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}));
   alert('保存しました');
 }
-function quickSave(){localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}))}
+function quickSave(){staff=(staff||[]).filter(s=>s&&s.role!=='調理場').map(s=>({...s,role:'ホール'}));localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}))}
 
 function exportSettingsData(){
   try{
@@ -3179,7 +3185,6 @@ function openDetail(id){
     </select></div>
     <div><label>入力型</label><select onchange="setStaff('input',this.value)"><option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option><option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option></select></div>
     <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
-    <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
     <div class="wide"><label>メイン時間</label><div class="timeRange"><select class="mainModeSelect" onchange="setStaff('mainMode',this.value)">
       <option value="出勤固定" ${s.mainMode==='出勤固定'?'selected':''}>出勤固定</option>
       <option value="退勤固定" ${s.mainMode==='退勤固定'?'selected':''}>退勤固定</option>
@@ -9341,6 +9346,24 @@ setTimeout(()=>{window.prodRenderAdminCalendar?.();if(staffId())window.prodRende
 })();
 </script>
 <!-- ===== /v40 ===== -->
+
+<script id="v-kitchen-person-removal-final">
+(()=>{
+  function purgeDedicatedKitchenPeople(){
+    if(!Array.isArray(staff)) return;
+    const removed=new Set(staff.filter(s=>s&&s.role==='調理場').map(s=>String(s.id)));
+    if(!removed.size){ staff=staff.map(s=>({...s,role:'ホール'})); return; }
+    staff=staff.filter(s=>s&&s.role!=='調理場').map(s=>({...s,role:'ホール'}));
+    for(const id of removed) delete (requests||{})[id];
+    for(const box of [schedule||{},actual||{},eventAttend||{}]) for(const k of Object.keys(box)) for(const id of removed) if(box[k]&&typeof box[k]==='object') delete box[k][id];
+    try{localStorage.setItem(storeKey,JSON.stringify({staff,requests,schedule,actual,events,eventAttend}));}catch(_){}
+  }
+  purgeDedicatedKitchenPeople();
+  const baseApply=window.applyDataObject||applyDataObject;
+  window.applyDataObject=function(d){baseApply(d);purgeDedicatedKitchenPeople();};
+  try{renderAll();renderStaff();}catch(_){}
+})();
+</script>
 </body>
 </html>
 
@@ -11600,7 +11623,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   function dayAvailable(s,d){if(hardOff(s,d)||softOff(s,d)||(vFinalHolidayLike(d)&&s.weekend===false))return false;if(s.input==='work'&&!requestedWork(s,d))return false;return true;}
   function reqRange(s,d){let r=R(s,d);if(!['時間','時間指定'].includes(r.m))return null;let st=r.ts!==''&&r.ts!=null?Number(r.ts):(r.d==='from'&&r.h!==''?Number(r.h):null);let en=r.te!==''&&r.te!=null?Number(r.te):(r.d==='until'&&r.h!==''?Number(r.h):null);return {st:Number.isFinite(st)?st:null,en:Number.isFinite(en)?en:null};}
   function fixedStart(s,d){let rr=reqRange(s,d);if(rr?.st!=null)return rr.st;if(['時間固定','出勤固定'].includes(MODE(s)))return Number(s.bs);return null;}
-  function allowed(s,d,p){if(!p)return true;if(!dayAvailable(s,d))return false;if(Number(p.end)-Number(p.start)>9)return false;if(EMP(s)&&Number(p.start)>13)return false;let rr=reqRange(s,d);if(rr?.st!=null&&Number(p.start)<rr.st)return false;if(rr?.en!=null&&Number(p.end)>rr.en)return false;let fs=fixedStart(s,d);if(fs!=null&&Number(p.start)!==fs)return false;if(MODE(s)==='時間固定'&&Number(p.end)!==Number(s.be))return false;if(MODE(s)==='退勤固定'&&Number(p.end)!==Number(s.be))return false;return true;}
+  function allowed(s,d,p){if(!p)return true;if(!dayAvailable(s,d))return false;if(Number(p.end)-Number(p.start)>9)return false;if(EMP(s)&&Number(p.start)>13)return false;let rr=reqRange(s,d);if(rr){if(rr.st!=null&&Number(p.start)<rr.st)return false;if(rr.en!=null&&Number(p.end)>rr.en)return false;if(rr.st!=null&&Number(p.start)!==rr.st)return false;return true;}let fs=fixedStart(s,d);if(fs!=null&&Number(p.start)!==fs)return false;if(MODE(s)==='時間固定'&&Number(p.end)!==Number(s.be))return false;if(MODE(s)==='退勤固定'&&Number(p.end)!==Number(s.be))return false;return true;}
   function normalizeOpening(d){
     const k=K(d);
     // Generated 10:00 starts are not part of the final process. Keep only explicit/fixed 10:00.
@@ -11664,7 +11687,16 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
       let candidates=H().filter(s=>EAR(s)&&SET(s)&&dayAvailable(s,d)&&Number(s.bs||99)<=9);
       candidates=candidates.filter(s=>SH(s,d)?setupRunIfAssigned(s,d)<=Number(s.max||5):runIfAdded(s,d)<=Number(s.max||5));
       if(!candidates.length)continue;
-      candidates.sort((a,b)=>setupCount(a)-setupCount(b)||dates.filter(x=>SH(a,x)).length-dates.filter(x=>SH(b,x)).length);
+      // Prefer the setup worker who also bridges the coming daytime shortage, then monthly fairness.
+      // This prevents a short 9-13 worker from being selected mechanically when a 9-17-capable worker makes the 13-17 relay cleaner.
+      const bridgeScore=s=>{
+        let p=SH(s,d),end=p?Number(p.end):Number(s.be||13);
+        if(!Number.isFinite(end))end=13;
+        let score=0;
+        for(const h of [13,14,15,16]) if(end>h && activeCount(d,h,s.id)<4) score++;
+        return score;
+      };
+      candidates.sort((a,b)=>bridgeScore(b)-bridgeScore(a)||setupCount(a)-setupCount(b)||dates.filter(x=>SH(a,x)).length-dates.filter(x=>SH(b,x)).length);
       let pick=candidates[0];
       if(current.length===1&&current[0].id===pick.id)continue;
       let pp=SH(pick,d);let en=pp?Number(pp.end):Math.min(closeHour(d),Number(pick.be||13),18);
@@ -11754,11 +11786,15 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
     for(const d of dates){let k=K(d);for(const s of H()){let p=SH(s,d);if(!p)continue;
       if(!dayAvailable(s,d)){delete schedule[k][s.id];continue;}
       let rr=reqRange(s,d),fs=fixedStart(s,d),st=Number(p.start),en=Number(p.end),mode=MODE(s);
-      if(fs!=null&&st!==fs)st=fs;
-      if(rr?.st!=null)st=Math.max(st,rr.st);
-      if(rr?.en!=null)en=Math.min(en,rr.en);
-      if(mode==='時間固定'){st=Number(s.bs);en=Number(s.be);}
-      else if(mode==='退勤固定')en=Number(s.be);
+      // Daily submitted time is the highest-priority time rule. Normal fixed modes apply only when that day has no explicit time request.
+      if(rr){
+        if(rr.st!=null)st=rr.st;
+        if(rr.en!=null)en=rr.en;
+      }else{
+        if(fs!=null&&st!==fs)st=fs;
+        if(mode==='時間固定'){st=Number(s.bs);en=Number(s.be);}
+        else if(mode==='退勤固定')en=Number(s.be);
+      }
       if(EMP(s)&&st>13){delete schedule[k][s.id];continue;}
       if(en-st>9)en=st+9;
       let np={...p,label:String(st),start:st,end:en};
@@ -11775,11 +11811,18 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   }
   function restoreLateCoverage(){
     for(const d of dates){let k=K(d),c=closeHour(d);if(c<=18)continue;
-      let target=5;
+      let adj=Number((window.prodDayAdjust||{})[k]??0);
+      let target=Math.max(3,Math.min(5,4+Math.max(-1,Math.min(1,adj))));
       let need=()=>Math.max(0,...[18,19,20,21].filter(h=>h<c).map(h=>target-activeCount(d,h)));
       let guard=0;while(need()>0&&guard++<20){
         let cand=H().filter(s=>!SH(s,d)&&dayAvailable(s,d)&&!EMP(s)&&!EAR(s)).map(s=>({s,p:lateCandidatePattern(s,d)})).filter(x=>x.p);
         cand=cand.filter(x=>runIfAdded(x.s,d)<=Number(x.s.max||5));
+        // できれば休み is only a last fallback. It is never mixed into the normal candidate pool.
+        if(!cand.length){
+          cand=H().filter(s=>!SH(s,d)&&softOff(s,d)&&!hardOff(s,d)&&!EMP(s)&&!EAR(s)&&(s.input!=='work'||requestedWork(s,d))).map(s=>{
+            let r=R(s,d),bak=r.m;r.m='';let p=lateCandidatePattern(s,d);r.m=bak;return {s,p};
+          }).filter(x=>x.p&&runIfAdded(x.s,d)<=Number(x.s.max||5));
+        }
         cand.sort((a,b)=>{let aw=dates.filter(x=>SH(a.s,x)).length,bw=dates.filter(x=>SH(b.s,x)).length;let ar=({S:5,A:4,B:3,C:2,D:1,E:0}[a.s.rank]??1)-((a.s.skills||[]).includes('新人')?1:0),br=({S:5,A:4,B:3,C:2,D:1,E:0}[b.s.rank]??1)-((b.s.skills||[]).includes('新人')?1:0);return aw-bw||br-ar;});
         let pick=cand.find(x=>[18,19,20,21].some(h=>h<c&&x.p.start<=h&&x.p.end>h&&activeCount(d,h)<target));
         if(!pick)break;schedule[k]??={};schedule[k][pick.s.id]=pick.p;
@@ -11803,7 +11846,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
       if(publicOff!==8)out.push(`${e.name}:公休${publicOff}日（8日必須）`);
     }
     for(const s of H()){
-      let run=0,mx=0;for(const d of dates){if(SH(s,d)){run++;mx=Math.max(mx,run)}else run=0;}
+      let run=priorRun(s),mx=run;for(const d of dates){if(SH(s,d)){run++;mx=Math.max(mx,run)}else run=0;}
       if(mx>Number(s.max||5))out.push(`${s.name}:最大連勤${mx}日（設定${Number(s.max||5)}日）`);
       if(EAR(s))for(const d of dates){let p=SH(s,d);if(p&&!explicitTime(s,d)&&Number(p.start)>11)out.push(`${K(d)}:${s.name} 早番の不自然な${p.start}時開始`);}
     }
