@@ -9943,7 +9943,16 @@ body.prodStaffMode #preview.v33-staff-preview{display:flex!important;z-index:999
  // Staff request calendar: blank means the mode's default, never "未入力".
  const oldReqRender=window.prodRenderRequestForm;window.prodRenderRequestForm=function(){oldReqRender();const def=(window.prodStaffInputMode||'off')==='work'?'休み':'出勤';document.querySelectorAll('#prodRequestGrid .prodCalDay').forEach(cell=>{if(cell.classList.contains('out'))return;let s=cell.querySelector('.prodReqSummary');if(!s){s=document.createElement('div');s.className='prodReqSummary';cell.appendChild(s)}if(!s.textContent.trim()||s.textContent.trim()==='未入力')s.textContent=def;s.classList.toggle('v33-off',def==='休み');s.classList.toggle('v33-work',def==='出勤')})};
  function pubEvent(p,k){const x=p.events?.[k];if(!x)return'';const n=typeof x==='object'?(x.name??x.memo??''):x,st=typeof x==='object'?(x.start??''):'';return [n,st!==''?`${st}時`:''].filter(Boolean).join(' ')}
- function table(p){if(!p?.dates?.length||!p?.staff)return'<tr><td>まだシフトは公開されていません</td></tr>';const hs=p.staff.filter(s=>s.role==='ホール'),evr='<tr><th></th>'+p.dates.map(k=>`<th><div class="previewEvent">${E(pubEvent(p,k))}</div></th>`).join('')+'</tr>',hdr='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${W[d.getDay()]}</th>`}).join('')+'</tr>',rows=hs.map(s=>'<tr><td>'+E(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id],ck=q&&p.eventAttend?.[k]?.[s.id]?' ✓':'';return `<td>${q?E(q.label??q.start)+ck:'／'}</td>`}).join('')+'</tr>').join('');return evr+hdr+rows}
+ function table(p){
+  if(!p?.dates?.length||!p?.staff)return'<tr><td>まだシフトは公開されていません</td></tr>';
+  const hs=p.staff.filter(s=>s.role==='ホール');
+  const evr='<tr><th></th>'+p.dates.map(k=>`<th><div class="previewEvent">${E(pubEvent(p,k))}</div></th>`).join('')+'</tr>';
+  const hdr='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');return `<th>${d.getDate()}<br>${W[d.getDay()]}</th>`}).join('')+'</tr>';
+  const grp=s=>s.employment==='社員'||s.category==='社員'?'社員':String(s.category||s.employment||'').includes('早番')?'早番':String(s.category||s.employment||'').match(/フリー|遅番/)?'フリー':'学生';
+  let rows='',prev='';
+  hs.forEach(s=>{const g=grp(s);if(prev&&g!==prev)rows+=`<tr class="groupGap"><td colspan="${p.dates.length+1}"></td></tr>`;prev=g;rows+='<tr><td>'+E(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id],ck=q&&p.eventAttend?.[k]?.[s.id]?' ✓':'';let z;if(q)z=E(q.label??q.start)+ck;else if(typeof window.vUnifiedHallMark==='function'&&p.schedule===schedule)z=E(window.vUnifiedHallMark(s,k));else z='／';return `<td>${z}</td>`}).join('')+'</tr>'});
+  return evr+hdr+rows
+}
  function showSheet(title,p,staffMode){const sh=document.getElementById('sheet'),pv=document.getElementById('preview');sh.innerHTML=`<div class="miniTitle">${E(title)} ホールシフト</div><table class="pt">${table(p)}</table>`;pv.classList.toggle('v33-staff-preview',!!staffMode);pv.classList.remove('hide')}
  window.renderPreview=function(){showSheet(document.getElementById('month').selectedOptions[0].textContent,{dates:dates.map(d=>ymd(d)),staff:H(),schedule,events,eventAttend},false)};
  window.prodShiftView=function(v){const m=document.getElementById('prodMonthShift'),d=document.getElementById('prodDailyShift'),p=document.getElementById('prodPreviewShift');if(v==='preview'){if(m)m.classList.add('hide');if(d)d.classList.add('hide');if(p)p.classList.add('hide');const pub=prodBoot?.published||{};showSheet(pub.monthStart?`${pub.monthStart.replace(/-/g,'/')}〜`: '公開済み',pub,true);return}if(document.getElementById('preview'))document.getElementById('preview').classList.remove('v33-staff-preview');if(m)m.classList.toggle('hide',v!=='month');if(d)d.classList.toggle('hide',v!=='daily');if(p)p.classList.add('hide');if(v==='daily'){const s=document.getElementById('prodDailyDate');if(s?.value)prodRenderDailyShift(s.value)}};
@@ -10497,20 +10506,21 @@ function priorRun(s){let snap=window.__prevShiftSnapshot||{},d=new Date(dates[0]
 function runIfAdd(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;if(i-l===0)l+=priorRun(s);for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
 function maxRun(s){let n=priorRun(s),m=n;for(const d of dates){if(SH(s,d)){n++;m=Math.max(m,n)}else n=0;}return m;}
 function skillValue(s,d,st,en){let v=0;for(let h=Math.max(11,Math.floor(st));h<Math.min(closeHour(d),Math.ceil(en));h++){let a=active(d,h);if(DR(s)&&!a.some(DR))v+=60;if(h>=17&&DC(s)&&!a.some(DC))v+=45;if(h>=17&&RC(s)&&!a.some(RC))v+=45;}return v;}
-function personScore(s,d,st,en){let sc=effRank(s)*500+skillValue(s,d,st,en)*20-workDays(s)*15;if(NEW(s))sc-=180;if(requested(s,d))sc+=80;if(softOff(s,d))sc-=5000;return sc;}
+function personScore(s,d,st,en){
+  let sc=effRank(s)*420+skillValue(s,d,st,en)*22-workDays(s)*22;
+  if(NEW(s))sc-=90;if(requested(s,d))sc+=180;if(softOff(s,d))sc-=5000;
+  const avail=dates.filter(x=>dayAvailable(s,x)).length||31;sc+=(31-avail)*18;if(STU(s))sc+=(31-avail)*18;if(FREE(s))sc+=80;return sc;
+}
 function patterns(s,d,allowSoft=false){
-  if(!dayAvailable(s,d,allowSoft))return[];let b=bounds(s,d),c=closeHour(d),out=[],starts=[];
-  let fs=fixedStart(s,d);if(fs!=null)starts=[fs];
-  else if(EMP(s))starts=[b.min,9,11,12,13];
-  else if(EAR(s))starts=b.min<=9?[9,11]:[Math.max(11,b.min)];
-  else if(FREE(s))starts=HOL(d)?[11,13,14,16,17]:[13,14,16,17];
-  else if(STU(s))starts=HOL(d)?[b.min,13,14,16,17,18]:[b.min,17,18];
-  else starts=[b.min];
-  starts=[...new Set(starts.map(Number))].filter(st=>Number.isFinite(st)&&st>=b.min&&st<c);
-  for(let st of starts){let en;if(['時間固定','退勤固定'].includes(b.mode)||b.rr?.en!=null)en=b.max;else if(EMP(s)||FREE(s))en=Math.min(b.max,c,st+9);else en=Math.min(b.max,c,st+9);if(valid(s,d,st,en,allowSoft))out.push([st,en]);}
+  if(!dayAvailable(s,d,allowSoft))return[];let b=bounds(s,d),c=closeHour(d),out=[],starts=[],fs=fixedStart(s,d);
+  if(fs!=null)starts=[fs];else if(EMP(s))starts=[b.min,9,11,12,13];else if(EAR(s))starts=[9,11,12,13,14,15,16,17];else if(FREE(s))starts=HOL(d)?[11,12,13,14,15,16,17]:[11,13,14,15,16,17];else if(STU(s))starts=HOL(d)?[11,12,13,14,15,16,17,18]:[13,14,15,16,17,18];else starts=[b.min,11,13,14,16,17,18];
+  starts=[...new Set(starts.map(Number))].filter(x=>Number.isFinite(x)&&x>=b.min&&x<c);
+  for(const x of starts){let ends=[];if(['時間固定','退勤固定'].includes(b.mode)||b.rr?.en!=null)ends=[b.max];else{let longest=Math.min(b.max,c,x+9);ends=[longest];if(!EMP(s)&&!FREE(s))for(const e of [x+4,x+5,x+6,x+7,x+8])if(e<=longest)ends.push(e);}for(const en of [...new Set(ends)])if(valid(s,d,x,en,allowSoft))out.push([x,en]);}
   return out;
 }
-function bestPattern(s,d,goal='normal',allowSoft=false){let ps=patterns(s,d,allowSoft);if(!ps.length)return null;let score=p=>{let [st,en]=p,v=personScore(s,d,st,en)+(en-st)*10;if(goal==='open')v+=(st===9?10000:0);if(goal==='late')v+=en>=Math.min(22,closeHour(d))?3000:0;if(goal==='weekend')v+=(en-st)*100+(st===11?-40:0);return v;};return ps.sort((a,b)=>score(b)-score(a))[0];}
+function bestPattern(s,d,goal='normal',allowSoft=false){
+  let ps=patterns(s,d,allowSoft);if(!ps.length)return null;let score=p=>{let [st,en]=p,v=personScore(s,d,st,en),use=0,over=0;for(let h=Math.max(9,st);h<en;h++){let n=active(d,h).length,need=requiredHead(d,h);if(n<need)use+=(need-n)*300;else over+=(n-need+1)*35;}v+=use-over+(en-st)*8;if(goal==='open')v+=st===9?10000:0;if(goal==='late')v+=en>=Math.min(22,closeHour(d))?3000:0;if(goal==='weekend')v+=(en-st)*90-(st===11?60:0);return v;};return ps.sort((a,b)=>score(b)-score(a))[0];
+}
 function employeeTarget(e){return Math.max(0,dates.length-8-dates.filter(d=>paid(e,d)).length);}
 function assignEmployees(){
   const es=H().filter(EMP);
@@ -10533,7 +10543,7 @@ function addForCoverage(d,allowSoft=false){
   }
 }
 function weekendUseAvailable(){
-  for(const d of dates){if(!HOL(d))continue;let cand=H().filter(s=>!EMP(s)&&!SH(s,d)&&dayAvailable(s,d)).sort((a,b)=>effRank(b)-effRank(a)||workDays(a)-workDays(b));for(const s of cand){if(runIfAdd(s,d)>Number(s.max||6))continue;let ps=patterns(s,d),pick=ps.filter(p=>{for(let h=Math.max(11,p[0]);h<p[1];h++){let lim=h===11?4:7;if(active(d,h).length>=lim)return false;}return true;}).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];if(pick)put(s,d,...pick);}}
+  for(const d of dates){if(!HOL(d))continue;let cand=H().filter(s=>!EMP(s)&&!SH(s,d)&&dayAvailable(s,d)).sort((a,b)=>{let aa=dates.filter(x=>dayAvailable(a,x)).length,bb=dates.filter(x=>dayAvailable(b,x)).length;return aa-bb||((STU(b)?1:0)-(STU(a)?1:0))||workDays(a)-workDays(b)||effRank(b)-effRank(a);});for(const s of cand){if(runIfAdd(s,d)>Number(s.max||6))continue;let opts=patterns(s,d).map(p=>{let ok=true,pen=0;for(let h=Math.max(11,p[0]);h<p[1];h++){let lim=h===11?4:7,n=active(d,h).length;if(n>=lim)ok=false;pen+=Math.max(0,n-requiredHead(d,h))*30;}return {p,ok,sc:personScore(s,d,...p)+(p[1]-p[0])*120-pen};}).filter(x=>x.ok).sort((a,b)=>b.sc-a.sc);if(opts.length)put(s,d,...opts[0].p);}}
 }
 function capWeekend(){
   for(const d of dates){if(!HOL(d))continue;let guard=0;while(guard++<80){let oh=null;for(let h=11;h<closeHour(d);h++){let lim=h===11?4:7;if(active(d,h).length>lim){oh=h;break;}}if(oh==null)break;
@@ -10542,15 +10552,18 @@ function capWeekend(){
   }}
 }
 function weekdaySlack(){
-  for(const d of dates){if(HOL(d))continue;let thin=[13,14,15,16,17,18,19,20].some(h=>h<closeHour(d)&&active(d,h).length<=requiredHead(d,h));if(!thin)continue;let cand=H().filter(s=>!EMP(s)&&!SH(s,d)&&dayAvailable(s,d)&&runIfAdd(s,d)<=Number(s.max||6)).map(s=>({s,p:bestPattern(s,d)})).filter(x=>x.p&&x.p[0]>=11).sort((a,b)=>personScore(b.s,d,...b.p)-personScore(a.s,d,...a.p));if(cand.length)put(cand[0].s,d,...cand[0].p);}
+  for(const d of dates){if(HOL(d))continue;const hs=[13,14,15,16,17,18,19,20].filter(h=>h<closeHour(d));if(!hs.some(h=>active(d,h).length<=requiredHead(d,h)))continue;let cand=[];for(const s of H().filter(s=>!EMP(s)&&!SH(s,d)&&dayAvailable(s,d)&&runIfAdd(s,d)<=Number(s.max||6))){for(const p of patterns(s,d)){if(p[0]<11||p[1]<=13)continue;let overlap=hs.filter(h=>p[0]<=h&&p[1]>h&&active(d,h).length<=requiredHead(d,h)).length;if(!overlap)continue;let sc=personScore(s,d,...p)+overlap*350+(STU(s)?100:0)+(FREE(s)?120:0);cand.push({s,p,sc});}}cand.sort((a,b)=>b.sc-a.sc);if(cand.length)put(cand[0].s,d,...cand[0].p);}
 }
 function protectLateSkills(){
   for(const d of dates){let hours=[18,19,20,21].filter(h=>h<closeHour(d));for(const h of hours){let a=active(d,h);let needDR=!a.some(DR),needClose=h>=20&&!a.some(s=>DC(s)||RC(s)||EMP(s));if(!needDR&&!needClose)continue;let c=H().filter(s=>!SH(s,d)&&dayAvailable(s,d)&&runIfAdd(s,d)<=Number(s.max||6)).map(s=>({s,p:bestPattern(s,d,'late')})).filter(x=>x.p&&x.p[0]<=h&&x.p[1]>h&&(needDR&&DR(x.s)||needClose&&(DC(x.s)||RC(x.s)))).sort((a,b)=>personScore(b.s,d,...b.p)-personScore(a.s,d,...a.p));if(c.length)put(c[0].s,d,...c[0].p);}}
 }
-function breakRuns(){for(const s of H()){let lim=Number(s.max||6),guard=0;while(maxRun(s)>lim&&guard++<20){let choices=dates.filter(d=>SH(s,d)&&!eventAttend?.[K(d)]?.[s.id]&&!requested(s,d)&&!(Number(SH(s,d).start)===9&&SET(s)&&active(d,9,s.id).filter(SET).length===0)).sort((a,b)=>(HOL(a)?1:0)-(HOL(b)?1:0)||active(b,13,s.id).length-active(a,13,s.id).length);if(!choices.length)break;del(s,choices[0]);}}}
+function breakRuns(){
+  for(const s of H()){let lim=Number(s.max||6),guard=0;while(maxRun(s)>lim&&guard++<20){let choices=dates.filter(d=>SH(s,d)&&!eventAttend?.[K(d)]?.[s.id]&&!requested(s,d)&&!(Number(SH(s,d).start)===9&&SET(s)&&active(d,9,s.id).filter(SET).length===0)).sort((a,b)=>(HOL(a)?1:0)-(HOL(b)?1:0)||active(b,STU(s)?18:13,s.id).length-active(a,STU(s)?18:13,s.id).length);if(!choices.length)break;del(s,choices[0]);}}
+}
 function normalize(){for(const d of dates){for(const s of H()){let p=SH(s,d);if(!p)continue;if(!valid(s,d,Number(p.start),Number(p.end))){del(s,d);continue;}if(Number(p.start)===10&&fixedStart(s,d)!==10){if(valid(s,d,11,Number(p.end)))put(s,d,11,Number(p.end));else del(s,d);}}}}
 function issues(){let out=[];for(const d of dates){let k=K(d),n9=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9&&SET(s)).length;if(n9!==1)out.push(`${k}:9時仕込み担当${n9}人`);for(const s of H()){let p=SH(s,d);if(p&&!valid(s,d,Number(p.start),Number(p.end)))out.push(`${k}:${s.name} 絶対条件違反`);}if(employeeCount(d)<2&&H().filter(EMP).filter(e=>dayAvailable(e,d)).length>=2)out.push(`${k}:社員${employeeCount(d)}人`);if(HOL(d)){for(let h=11;h<closeHour(d);h++){let n=active(d,h).length,lim=h===11?4:7;if(n>lim)out.push(`${k}:${h}時${n}人（最大${lim}）`);}}let ev=events?.[k]||{},t=Number(ev.start??ev.time);if(Number.isFinite(t))for(const e of H().filter(s=>EMP(s)&&eventAttend?.[k]?.[s.id])){let p=SH(e,d);if(!p||p.start>t||p.end<=t)out.push(`${k}:${e.name} イベント開始時不在`);}}
   for(const e of H().filter(EMP)){let off=dates.filter(d=>!SH(e,d)&&!paid(e,d)).length;if(off!==8)out.push(`${e.name}:公休${off}日（8日必須）`);}for(const s of H())if(maxRun(s)>Number(s.max||6))out.push(`${s.name}:最大連勤${maxRun(s)}日`);return [...new Set(out)];}
+window.vUnifiedHallMark=function(s,k){const d=new Date(k+'T00:00:00');if(!s||Number.isNaN(d.getTime()))return '／';if(hardOff(s,d))return '×';if(HOL(d)&&s.weekend===false)return '×';if(s.input==='work'&&!requested(s,d))return '×';return '／';};
 function generate(){
   window.__prevShiftSnapshot=JSON.parse(JSON.stringify(schedule||{}));
   // ホールだけ作り直し。調理場やUIデータには触れない。
