@@ -850,7 +850,20 @@ function strengthVal(s){
 function val(s){return strengthVal(s)}
 function isWeakStaff(s){return !!(s.skills?.includes('新人') || ['D','E'].includes(s.rank))}
 function isStrongStaff(s){return strengthVal(s)>=1}
-function streak(id,idx){let c=0;for(let i=idx-1;i>=0;i--){let k=ymd(dates[i]);if(schedule[k]?.[id])c++;else break}return c}
+function streak(id,idx){
+  let c=0;
+  for(let i=idx-1;i>=0;i--){let k=ymd(dates[i]);if(schedule[k]?.[id])c++;else return c;}
+  // When generating a new closing period, continue the streak from the schedule that was
+  // present immediately before generation. On the very first generation there is no history,
+  // so the count naturally starts at zero.
+  let snap=window.__prevShiftSnapshot||{};
+  if(!dates.length)return c;
+  let d=new Date(dates[0]);d.setDate(d.getDate()-1);
+  for(let guard=0;guard<31;guard++,d.setDate(d.getDate()-1)){
+    let k=ymd(d);if(snap?.[k]?.[id])c++;else break;
+  }
+  return c;
+}
 function rankScore(s){return ({A:24,B:18,C:12,D:8,E:5}[s.rank]||10)}
 function availabilityCount(s){
   return dates.reduce((n,d)=>{
@@ -11231,6 +11244,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   // 新人は既存仕様どおり、戦力評価だけ1段階下げる。勤務区分の使い方自体は同じ。
   const effRank=s=>Math.max(0,rawRank(s)-(NEW(s)?1:0));
   const BPLUSFREE=s=>FREE(s)&&effRank(s)>=3;
+  const LATE_CAPABLE=s=>effRank(s)>=3 || DC(s) || RC(s) || DR(s);
   const DR=s=>(s.skills||[]).includes('ドリバ');
   const DC=s=>!!s.close||(s.skills||[]).includes('ドリバ締め');
   const RC=s=>(s.skills||[]).includes('レジ締め');
@@ -11242,7 +11256,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   const lateEnd=d=>Math.min(22,closeHour(d));
   const isLateAnchor=(s,d)=>{let p=SH(s,d);return !!(p&&BPLUSFREE(s)&&Number(p.start)<=17&&Number(p.end)>=lateEnd(d));};
   function assignedDays(s){return dates.reduce((n,d)=>n+(SH(s,d)?1:0),0)}
-  function maxRunIfAdd(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
+  function maxRunIfAdd(s,d){let i=dates.findIndex(x=>K(x)===K(d)),r=0;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return streak(s.id,i)+1+r;}
   function active(d,h,exceptId=null){return H().filter(s=>s.id!==exceptId&&SH(s,d)&&Number(SH(s,d).start)<=h&&Number(SH(s,d).end)>h);}
   function deficits(d,exceptId=null){let c=closeHour(d),v=0;for(let h=11;h<c;h++){let a=active(d,h,exceptId);let min=vFinalHolidayLike(d)?(h<13?3:3):3;if(a.length<min)v+=(min-a.length)*20;if(!a.some(DR))v+=12;}let z=active(d,Math.max(21,c-0.01),exceptId);if(z.length<Math.min(3,H().filter(s=>SH(s,d)).length))v+=Math.max(0,3-z.length)*8;return v;}
   function skillNeedScore(s,d,st,en,exceptId=null){let score=0,c=closeHour(d);for(let h=Math.max(11,st);h<Math.min(en,c);h++){let a=active(d,h,exceptId);if(!a.some(DR)&&DR(s))score+=65;if(h>=17&&!a.some(DC)&&DC(s))score+=45;if(h>=17&&!a.some(RC)&&RC(s))score+=55;if(h===11&&!a.some(SET)&&SET(s))score+=25;}return score;}
@@ -11256,12 +11270,17 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   function studentPatterns(s,d){let r=R(s,d),[rs,re]=reqBounds(s,d),st=rs!==null?rs:Number(s.bs||17),en=re!==null?re:Number(s.be||22);if(vFinalHolidayLike(d)&&s.otherMode==='土日祝'&&s.os!==''&&Number(s.os)<st)st=Number(s.os);en=Math.min(closeHour(d),en,st+9);return en>st?[[st,en]]:[];}
   function put(s,d,p){schedule[K(d)]??={};schedule[K(d)][s.id]={label:String(p[0]),start:p[0],end:p[1]};}
   function ensureBPlusFreeLate(){
-    for(const d of dates){if(H().some(s=>isLateAnchor(s,d)))continue;
+    // v244 used to force a B+ FREE worker every day. That over-selects the same two strong free workers.
+    // Final rule: B+ is a preference. Add/replace only when the late band is genuinely weak or missing skills.
+    for(const d of dates){
+      let lateHours=[18,19,20,21].filter(h=>h<closeHour(d));if(!lateHours.length)continue;
+      let weak=lateHours.some(h=>{let a=active(d,h);return a.length<3||!a.some(DR)||(h>=20&&!a.some(x=>DC(x)||RC(x)||EMP(x)));});
+      if(!weak)continue;
       let k=K(d),baseDef=deficits(d),cand=[];
-      for(const s of H().filter(BPLUSFREE)){if(!available(s,d)&&!SH(s,d))continue;if(maxRunIfAdd(s,d)>Number(s.max||6)&&!SH(s,d))continue;for(const p of freeLatePatterns(s,d)){let old=SH(s,d)?{...SH(s,d)}:null,ss=JSON.stringify(schedule);put(s,d,p);let def=deficits(d);schedule=JSON.parse(ss);cand.push({s,p,def,sc:personScore(s,d,p[0],p[1])+Math.max(0,baseDef-def)*5000});}}
+      for(const s of H().filter(x=>FREE(x)&&LATE_CAPABLE(x))){if(!available(s,d)&&!SH(s,d))continue;if(maxRunIfAdd(s,d)>Number(s.max||6)&&!SH(s,d))continue;for(const p of freeLatePatterns(s,d)){let ss=JSON.stringify(schedule);put(s,d,p);let def=deficits(d);schedule=JSON.parse(ss);cand.push({s,p,def,sc:personScore(s,d,p[0],p[1])+Math.max(0,baseDef-def)*5000});}}
       cand.sort((a,b)=>b.sc-a.sc||a.def-b.def);if(!cand.length)continue;let x=cand[0];
-      // 既にC以下フリーがいる場合は、人数を膨らませずB以上へ置換できるなら置換。
-      let low=H().filter(s=>FREE(s)&&SH(s,d)&&!BPLUSFREE(s)).sort((a,b)=>effRank(a)-effRank(b))[0];
+      // Prefer replacing a genuinely weaker surplus free worker instead of increasing headcount.
+      let low=H().filter(s=>FREE(s)&&SH(s,d)&&s.id!==x.s.id).sort((a,b)=>effRank(a)-effRank(b)||assignedDays(b)-assignedDays(a))[0];
       if(low&&!SH(x.s,d)){let ss=JSON.stringify(schedule),before=deficits(d);delete schedule[k][low.id];put(x.s,d,x.p);if(deficits(d)>before+4)schedule=JSON.parse(ss);}else put(x.s,d,x.p);
     }
   }
@@ -11314,7 +11333,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
       for(const s of cand){let old=SH(s,d),en=old?Number(old.end):Math.min(closeHour(d),Number(s.be||18),18);if(en<=9)continue;if(en-9>9)en=18;if(typeof v73AllowedShift==='function'&&!v73AllowedShift(s,d,9,en,true))continue;schedule[k]??={};schedule[k][s.id]={label:'9',start:9,end:en};break;}
     }
   }
-  function issues(){let out=[];for(const d of dates){let anchors=H().filter(s=>isLateAnchor(s,d));if(!anchors.length)out.push(`${K(d)}:遅番に実質B以上フリーバイトなし`);let nine=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9).length;if(nine!==1)out.push(`${K(d)}:9時${nine}人`);if(vFinalHolidayLike(d)&&active(d,11).length>4)out.push(`${K(d)}:11時${active(d,11).length}人（最大4人）`);}return out;}
+  function issues(){let out=[];for(const d of dates){let nine=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9).length;if(nine!==1)out.push(`${K(d)}:9時${nine}人`);if(vFinalHolidayLike(d)&&active(d,11).length>4)out.push(`${K(d)}:11時${active(d,11).length}人（最大4人）`);}return out;}
   window.v240AutoHall=function(){let real=window.alert;window.alert=()=>{};try{BASE();ensureBPlusFreeLate();rebalanceWeekdayFreeStudents();generalSkillAwareSwap();ensureBPlusFreeLate();rebalanceWeekdayFreeStudents();ensureNine();capWeekendEleven();ensureBPlusFreeLate();capWeekendEleven();}finally{window.alert=real;}window.v240Issues=[...(window.v236Validate?window.v236Validate():[]),...issues()];window.v240Issues=[...new Set(window.v240Issues)];quickSave();renderAll();real(window.v240Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v240Issues.length}件`:'ホールの自動生成をしました');};
   window.v240Validate=()=>[...new Set([...(window.v236Validate?window.v236Validate():[]),...issues()])];
   window.autoMake=window.v240AutoHall;window.v62AutoMake=window.autoMake;
@@ -11341,7 +11360,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   function available(s,d){ if(hard(s,d)||s.weekend===false)return false; if(s.input==='work'&&!requested(s,d))return false; return true; }
   function active(d,h,except=null){return H().filter(s=>s.id!==except&&SH(s,d)&&Number(SH(s,d).start)<=h&&Number(SH(s,d).end)>h);}
   function assigned(s){return dates.reduce((n,d)=>n+(SH(s,d)?1:0),0)}
-  function maxRunIfAdd(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
+  function maxRunIfAdd(s,d){let i=dates.findIndex(x=>K(x)===K(d)),r=0;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return streak(s.id,i)+1+r;}
   function put(s,d,st,en){ if(en<=st)return; if(en-st>9)en=st+9; schedule[K(d)]??={}; schedule[K(d)][s.id]={label:String(st),start:st,end:en}; }
   function score(s){let sc=rank(s)*1000-assigned(s)*12;if(DR(s))sc+=180;if(SET(s))sc+=120;return sc;}
   function studentShift(s,d){let r=R(s,d),st=Number(s.bs||17),en=Number(s.be||22);if(r.m==='時間'){
@@ -11377,7 +11396,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
     for(const s of cand){if(maxRunIfAdd(s,d)>Number(s.max||6))continue;let p=null;if(EAR(s))p=earlyShift(s,d);else if(STU(s)&&requested(s,d))p=studentShift(s,d);else if(FREE(s))continue;if(p)put(s,d,p[0],p[1]);}
   }
   function hasLateAnchor(d,except=null){return H().some(s=>s.id!==except&&BPLUSFREE(s)&&SH(s,d)&&Number(SH(s,d).start)<=17&&Number(SH(s,d).end)>=Math.min(22,closeHour(d)));}
-  function safeRemove(s,d){let p=SH(s,d);if(!p)return false;if(EAR(s)&&Number(p.start)===9&&active(d,9,s.id).length===0)return false;if(BPLUSFREE(s)&&!hasLateAnchor(d,s.id))return false;
+  function safeRemove(s,d){let p=SH(s,d);if(!p)return false;if(EAR(s)&&Number(p.start)===9&&active(d,9,s.id).length===0)return false;
     for(let h=Math.max(11,Math.floor(Number(p.start)));h<Math.min(closeHour(d),Math.ceil(Number(p.end)));h++){
       // 土日は厚めを維持。削除後4人未満になるなら削らない。
       if(active(d,h,s.id).length<4)return false;
@@ -11401,7 +11420,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
     }
   }
   function weekendPass(){for(const d of dates){if(!weekend(d))continue;addWeekendAvailable(d);rebuildWeekendFree(d);trimWeekendExcess(d);}}
-  function validate(){let out=[];for(const d of dates){if(!weekend(d))continue;if(active(d,11).length>4)out.push(`${K(d)}:11時${active(d,11).length}人（最大4人）`);for(let h=13;h<closeHour(d);h++)if(active(d,h).length>8)out.push(`${K(d)}:${h}時${active(d,h).length}人（過剰）`);let fs=H().filter(s=>FREE(s)&&SH(s,d)&&!freeExplicit(s,d));for(const s of fs){let p=SH(s,d);if(Number(p.end)-Number(p.start)<Math.min(9,closeHour(d)-Number(p.start)))out.push(`${K(d)}:${s.name} フリー短時間`);}if(!hasLateAnchor(d))out.push(`${K(d)}:遅番に実質B以上フリーなし`);}return [...new Set(out)];}
+  function validate(){let out=[];for(const d of dates){if(!weekend(d))continue;if(active(d,11).length>4)out.push(`${K(d)}:11時${active(d,11).length}人（最大4人）`);for(let h=13;h<closeHour(d);h++)if(active(d,h).length>8)out.push(`${K(d)}:${h}時${active(d,h).length}人（過剰）`);let fs=H().filter(s=>FREE(s)&&SH(s,d)&&!freeExplicit(s,d));for(const s of fs){let p=SH(s,d);if(Number(p.end)-Number(p.start)<Math.min(9,closeHour(d)-Number(p.start)))out.push(`${K(d)}:${s.name} フリー短時間`);}}return [...new Set(out)];}
   window.v241AutoHall=function(){let real=window.alert;window.alert=()=>{};try{BASE();weekendPass();}finally{window.alert=real;}window.v241Issues=[...(window.v240Validate?window.v240Validate():[]),...validate()];window.v241Issues=[...new Set(window.v241Issues)];quickSave();renderAll();real(window.v241Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v241Issues.length}件`:'ホールの自動生成をしました');};
   window.v241Validate=()=>[...new Set([...(window.v240Validate?window.v240Validate():[]),...validate()])];
   window.autoMake=window.v241AutoHall;window.v62AutoMake=window.autoMake;
@@ -11433,7 +11452,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
    schedule[K(d)][s.id]={...p,label:String(ns),start:ns,end:en};return true;
  }
  return false;}
- function safeRemove(s,d){let p=SH(s,d);if(!p||EMP(s))return false;if(BPLUS(s)&&!hasB(d,s.id))return false;for(let h=Math.floor(Number(p.start));h<Math.ceil(Number(p.end));h++){if(h>=11&&active(d,h,s.id).length<4)return false;if(DR(s)&&!active(d,h,s.id).some(DR))return false;}return true;}
+ function safeRemove(s,d){let p=SH(s,d);if(!p||EMP(s))return false;for(let h=Math.floor(Number(p.start));h<Math.ceil(Number(p.end));h++){if(h>=11&&active(d,h,s.id).length<4)return false;if(DR(s)&&!active(d,h,s.id).some(DR))return false;}return true;}
  function cap7(){for(const d of dates){if(!weekend(d))continue;let guard=0;while(guard++<100){let oh=null;for(let h=11;h<closeHour(d);h++){let lim=h===11?4:7;if(active(d,h).length>lim){oh=h;break;}}if(oh===null)break;if(delayOne(d,oh))continue;let rm=active(d,oh).filter(s=>safeRemove(s,d)).sort((a,b)=>score(a)-score(b))[0];if(!rm)break;delete schedule[K(d)][rm.id];}}}
  function validate(){let out=[];for(const d of dates){if(!weekend(d))continue;for(let h=11;h<closeHour(d);h++){let lim=h===11?4:7,n=active(d,h).length;if(n>lim)out.push(`${K(d)}:${h}時${n}人（最大${lim}人）`);}}return [...new Set(out)];}
  window.v242AutoHall=function(){let real=window.alert;window.alert=()=>{};try{BASE();cap7();}finally{window.alert=real;}window.v242Issues=[...(window.v240Validate?window.v240Validate():[]),...validate()];window.v242Issues=[...new Set(window.v242Issues)];quickSave();renderAll();real(window.v242Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v242Issues.length}件`:'ホールの自動生成をしました');};
@@ -11471,9 +11490,9 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
    function rec(ix,picks){if(ix===choices.length){
      let counts={...base},hours=0,on=0,lateB=false,coverage=0;
      for(let j=0;j<picks.length;j++){let [st,en]=picks[j],s=choices[j].s;if(st==null)continue;on++;hours+=en-st;if(BPLUS(s)&&st<=17&&en>=Math.min(22,closeHour(d)))lateB=true;for(let h=st;h<en;h++)counts[h]=(counts[h]||0)+1;}
-     if(!lateB)return;for(let h=11;h<closeHour(d);h++){let lim=h===11?4:7;if((counts[h]||0)>lim)return;let target=h===11?3:(h<17?5:5);coverage+=Math.min(counts[h]||0,target)*6;}
+     for(let h=11;h<closeHour(d);h++){let lim=h===11?4:7;if((counts[h]||0)>lim)return;let target=h===11?3:(h<17?5:5);coverage+=Math.min(counts[h]||0,target)*6;}
      // 長時間利用を最優先。同点なら多くのフリーを使い、次に薄い時間帯を埋める。
-     let score=hours*1000+on*80+coverage;
+     let score=hours*1000+on*80+coverage+(lateB?120:0);
      if(!best||score>best.score)best={score,picks:picks.map(x=>x&&[...x])};return;}
      for(const p of choices[ix].ps){picks.push(p);rec(ix+1,picks);picks.pop();}}
    rec(0,[]);if(!best)return;
@@ -11481,7 +11500,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
    best.picks.forEach((p,j)=>{if(!p||p[0]==null)return;let s=choices[j].s,st=p[0],en=p[1];schedule[K(d)][s.id]={label:String(st),start:st,end:en};});
  }
  function pass(){for(const d of dates)optimizeDay(d);}
- function validate(){let out=[];for(const d of dates){if(!weekend(d))continue;for(let h=11;h<closeHour(d);h++){let n=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)<=h&&Number(SH(s,d).end)>h).length,lim=h===11?4:7;if(n>lim)out.push(`${K(d)}:${h}時${n}人（最大${lim}人）`);}let flex=H().filter(s=>FREE(s)&&SH(s,d)&&!explicit(s,d));if(flex.length&&!flex.some(s=>BPLUS(s)&&Number(SH(s,d).start)<=17&&Number(SH(s,d).end)>=Math.min(22,closeHour(d))))out.push(`${K(d)}:B以上フリー遅番なし`);}return [...new Set(out)];}
+ function validate(){let out=[];for(const d of dates){if(!weekend(d))continue;for(let h=11;h<closeHour(d);h++){let n=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)<=h&&Number(SH(s,d).end)>h).length,lim=h===11?4:7;if(n>lim)out.push(`${K(d)}:${h}時${n}人（最大${lim}人）`);}}return [...new Set(out)];}
  window.v243AutoHall=function(){let real=window.alert;window.alert=()=>{};try{BASE();pass();}finally{window.alert=real;}window.v243Issues=[...(window.v240Validate?window.v240Validate():[]),...validate()];window.v243Issues=[...new Set(window.v243Issues)];quickSave();renderAll();real(window.v243Issues.length?`ホールの自動生成をしました\n確認が必要な項目：${window.v243Issues.length}件`:'ホールの自動生成をしました');};
  window.v243Validate=()=>[...new Set([...(window.v240Validate?window.v240Validate():[]),...validate()])];
  window.autoMake=window.v243AutoHall;window.v62AutoMake=window.autoMake;
@@ -11540,9 +11559,9 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
    let choices=flex.map(s=>({s,ps:startsFor(s,d)}));let best=null;
    function rec(ix,picks){if(ix===choices.length){let counts={...base},on=0,hours=0,lateB=false,coverage=0,earlyNeed=0;
      for(let j=0;j<picks.length;j++){let p=picks[j],s=choices[j].s;if(!p)continue;on++;hours+=p[1]-p[0];if(BPLUS(s)&&p[0]<=17&&p[1]>=Math.min(22,close(d)))lateB=true;for(let h=p[0];h<p[1];h++)counts[h]=(counts[h]||0)+1;}
-     if(!lateB)return;for(let h=11;h<close(d);h++){let lim=h===11?4:7;if((counts[h]||0)>lim)return;let target=h===11?4:(h<17?6:5);coverage+=Math.min(counts[h]||0,target);if((counts[h]||0)<3)earlyNeed+=3-(counts[h]||0);}
+     for(let h=11;h<close(d);h++){let lim=h===11?4:7;if((counts[h]||0)>lim)return;let target=h===11?4:(h<17?6:5);coverage+=Math.min(counts[h]||0,target);if((counts[h]||0)<3)earlyNeed+=3-(counts[h]||0);}
      // 最優先: 出勤可能フリーをできるだけ全員使う。次に長時間、次に時間帯の穴。
-     let score=on*100000+hours*1000+coverage*20-earlyNeed*100;
+     let score=on*100000+hours*1000+coverage*20-earlyNeed*100+(lateB?150:0);
      if(!best||score>best.score)best={score,picks:picks.map(p=>p?[...p]:null)};return;}
      let opts=choices[ix].ps.map(p=>p);opts.push(null);for(const p of opts){picks.push(p);rec(ix+1,picks);picks.pop();}}
    rec(0,[]);if(!best)return;schedule[K(d)]??={};for(const {s} of choices)delete schedule[K(d)][s.id];best.picks.forEach((p,j)=>{if(p)setShift(d,choices[j].s,p);});
@@ -11555,7 +11574,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
  function pass(){for(const d of dates){if(!weekend(d))continue;ensureAllNonFree(d);optimizeFree(d);secondChance(d);optimizeFree(d);}}
  function validate(){let out=[];for(const d of dates){if(!weekend(d))continue;
    for(let h=11;h<close(d);h++){let n=active(d,h).length,lim=h===11?4:7;if(n>lim)out.push(`${K(d)}:${h}時${n}人（最大${lim}人）`);}
-   let frees=H().filter(s=>FREE(s)&&available(s,d));if(frees.length&&!H().some(s=>BPLUS(s)&&SH(s,d)&&Number(SH(s,d).start)<=17&&Number(SH(s,d).end)>=Math.min(22,close(d))))out.push(`${K(d)}:遅番に実質B以上フリーなし`);
+   
    // 出勤可能なのに休みのバイトは、どの許容時間にも入れられない場合だけ許容。
    for(const s of H().filter(s=>!EMP(s)&&available(s,d)&&!SH(s,d))){let can=startsFor(s,d).some(p=>fits(d,p[0],p[1],s.id));if(can)out.push(`${K(d)}:${s.name} 出勤可能なのに未採用`);}
  }
@@ -11604,7 +11623,7 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
   const explicitRequestTime=(s,d)=>{let r=R(s,d);return ['時間','時間指定'].includes(r.m);};
   const fixedShiftTime=s=>['時間固定','出勤固定','退勤固定'].includes(MODE(s));
   const explicitTime=(s,d)=>explicitRequestTime(s,d)||fixedShiftTime(s);
-  function runLengthIfWorked(s,idx,ignoreIdx=-1){let n=0,m=0;for(let i=0;i<dates.length;i++){let on=i!==ignoreIdx&&!!SH(s,dates[i]);if(on){n++;m=Math.max(m,n)}else n=0;}return m;}
+  function runLengthIfWorked(s,idx,ignoreIdx=-1){let n=priorRun(s),m=n;for(let i=0;i<dates.length;i++){let on=i!==ignoreIdx&&!!SH(s,dates[i]);if(on){n++;m=Math.max(m,n)}else n=0;}return m;}
   function activeCount(d,h,exceptId=null){return H().filter(s=>s.id!==exceptId&&SH(s,d)&&Number(SH(s,d).start)<=h&&Number(SH(s,d).end)>h).length;}
   function canDropGenerated(s,d){
     if(!SH(s,d)||explicitRequestTime(s,d))return false;
@@ -11636,7 +11655,8 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
     for(const d of dates){for(const s of H()){if(SH(s,d)&&!dayAvailable(s,d))delete schedule[K(d)][s.id];}}
   }
   function setupRunIfAssigned(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
-  function runIfAdded(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
+  function priorRun(s){if(!dates.length)return 0;let snap=window.__prevShiftSnapshot||{},d=new Date(dates[0]),n=0;d.setDate(d.getDate()-1);for(let g=0;g<31;g++,d.setDate(d.getDate()-1)){if(snap?.[K(d)]?.[s.id])n++;else break;}return n;}
+  function runIfAdded(s,d){let i=dates.findIndex(x=>K(x)===K(d)),l=0,r=0;for(let j=i-1;j>=0&&SH(s,dates[j]);j--)l++;if(i-l===0)l+=priorRun(s);for(let j=i+1;j<dates.length&&SH(s,dates[j]);j++)r++;return l+1+r;}
   function setupCount(s){return dates.filter(d=>Number(SH(s,d)?.start)===9).length;}
   function rebalanceSetupFinal(){
     for(const d of dates){let k=K(d);
@@ -11813,19 +11833,23 @@ window.vFinalHolidayLike=function(d){return d.getDay()===0||d.getDay()===6||(typ
     processFinalNormalize();
   }
   window.vFinal244ProcessOrder=[
-    '希望・勤務可能時間','絶対条件','社員勤務日・公休','イベント','9時仕込み','11時〜昼',
-    'フリー・中番','学生・遅番','新人・ランク・スキル','平日・土日祝調整','人数補正',
-    'できれば休み','月間バランス','閉店確認','過剰時間調整','自動休み','最終検査','再調整','完成表示'
+    '希望・出勤希望確認','前期間末の連勤確認','イベント確認','スキル・役割・ランク等の設定確認',
+    '社員勤務日・公休8日','9時仕込み担当','11時〜昼','フリー・中番','学生・遅番',
+    '新人・ランク・スキル補正','平日・土日祝調整','人数補正','できれば休み','月間バランス',
+    '閉店確認','過剰時間調整','自動休み','最終検査','再調整','完成表示'
   ];
   window.vFinal244AutoHall=function(){
     let real=window.alert;window.alert=()=>{};
     try{
       // v244 is deliberately the base; never replace it with a new generator.
+      // Preserve the schedule that existed before generation so a new period can inherit
+      // the previous period's ending streak. First-ever generation simply has no history.
+      window.__prevShiftSnapshot=JSON.parse(JSON.stringify(schedule||{}));
       BASE();
-      // Run the ordered final gates twice. The second pass catches dependencies created by
-      // run/opening repairs without inventing a separate generation algorithm.
+      // One ordered repair pass. Repeat only when the first pass still leaves a final-process violation;
+      // this avoids repeatedly rewriting a good v244 result.
       runFinalProcessCycle();
-      runFinalProcessCycle();
+      if(finalIssues().length)runFinalProcessCycle();
     }finally{window.alert=real;}
     let issues=[...(window.v244Validate?window.v244Validate():[]),...finalIssues()];
     window.vFinal244Issues=[...new Set(issues)];quickSave();renderAll();
