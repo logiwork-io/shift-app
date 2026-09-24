@@ -608,6 +608,8 @@ function applyDataObject(d){
     if(s.max===undefined) s.max=5;
     if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
     if(s.mainMode===undefined) s.mainMode='フリー';
+    if(s.mainFixed===undefined) s.mainFixed=(s.mainMode==='時間固定'||s.mainMode==='固定');
+    if(s.weekendFixed===undefined) s.weekendFixed=false;
     if(s.closePriority===undefined) s.closePriority=false;
     if(s.mainMode==='固定') s.mainMode='時間固定';
   });
@@ -661,6 +663,8 @@ function importSettingsData(){
       if(s.category===undefined) s.category=staffCategory(s);
       if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
       if(s.mainMode===undefined) s.mainMode='フリー';
+      if(s.mainFixed===undefined) s.mainFixed=(s.mainMode==='時間固定'||s.mainMode==='固定');
+      if(s.weekendFixed===undefined) s.weekendFixed=false;
       if(s.closePriority===undefined) s.closePriority=false;
       if(s.mainMode==='固定') s.mainMode='時間固定';
       if(s.max===undefined) s.max=5;
@@ -3161,6 +3165,8 @@ function openDetail(id){
   if(s.weekend===undefined) s.weekend=true;
   if(s.otherMode===undefined||s.otherMode==='なし') s.otherMode='フリー';
   if(s.mainMode===undefined) s.mainMode='フリー';
+  if(s.mainFixed===undefined) s.mainFixed=(s.mainMode==='時間固定'||s.mainMode==='固定');
+  if(s.weekendFixed===undefined) s.weekendFixed=false;
   if(s.closePriority===undefined) s.closePriority=false;
   if(s.employment===undefined || s.employment==='バイト') s.employment = staffCategory(s);
   s.category=s.employment;
@@ -3181,13 +3187,8 @@ function openDetail(id){
     <div><label>入力型</label><select onchange="setStaff('input',this.value)"><option value="off" ${s.input==='off'?'selected':''}>希望休を入力</option><option value="work" ${s.input==='work'?'selected':''}>出勤を入力</option></select></div>
     <div><label>土日出勤</label><select onchange="setStaff('weekend',this.value==='true')"><option value="true" ${s.weekend!==false?'selected':''}>可</option><option value="false" ${s.weekend===false?'selected':''}>不可</option></select></div>
     <div><label>担当</label><select onchange="setStaff('role',this.value)"><option ${s.role==='ホール'?'selected':''}>ホール</option><option ${s.role==='調理場'?'selected':''}>調理場</option></select></div>
-    <div class="wide"><label>メイン時間</label><div class="timeRange"><select class="mainModeSelect" onchange="setStaff('mainMode',this.value)">
-      <option value="出勤固定" ${s.mainMode==='出勤固定'?'selected':''}>出勤固定</option>
-      <option value="退勤固定" ${s.mainMode==='退勤固定'?'selected':''}>退勤固定</option>
-      <option value="時間固定" ${s.mainMode==='時間固定'||s.mainMode==='固定'?'selected':''}>時間固定</option>
-      <option value="フリー" ${!s.mainMode||s.mainMode==='フリー'?'selected':''}>フリー</option>
-    </select><select onchange="setStaff('bs',Number(this.value))">${timeOpts(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',Number(this.value))">${timeOpts(s.be,9,23)}</select></div><div class="otherModeNote">出勤固定=入り固定 / 退勤固定=上がり固定 / 時間固定=完全固定 / フリー=範囲内で調整。</div></div>
-    <div class="wide"><label>その他時間</label><div class="timeRange"><select class="otherModeSelect" onchange="setStaff('otherMode',this.value)"><option value="フリー" ${s.otherMode==='フリー'||s.otherMode==='なし'?'selected':''}>フリー</option><option ${s.otherMode==='平日'?'selected':''}>平日</option><option ${s.otherMode==='土日祝'?'selected':''}>土日祝</option></select><select onchange="setStaff('os',this.value)">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value)">${timeOptsWithNone(s.oe,9,23)}</select></div><div class="otherModeNote">その他時間は、時間が選ばれている時だけ候補になります。未選択ならメイン時間のみです。固定/フリーどちらでも最終手段です。</div></div>
+    <div class="wide"><label>メイン時間</label><div class="timeRange"><button type="button" class="${s.mainFixed?'':'sec'}" onclick="setStaff('mainFixed',!${!!s.mainFixed});openDetail('${s.id}')">固定</button><select onchange="setStaff('bs',this.value===''?'':Number(this.value))">${timeOptsWithNone(s.bs,9,23)}</select><span>〜</span><select onchange="setStaff('be',this.value===''?'':Number(this.value))">${timeOptsWithNone(s.be,9,23)}</select></div><div class="otherModeNote">固定ON＋両方入力＝完全固定。固定OFFでは、両方入力＝範囲内で調整／開始だけ＝出勤時間固定／終了だけ＝退勤時間固定。</div></div>
+    <div class="wide"><label>土日祝</label><div class="timeRange"><button type="button" class="${s.weekendFixed?'':'sec'}" onclick="setStaff('weekendFixed',!${!!s.weekendFixed});openDetail('${s.id}')">固定</button><select onchange="setStaff('os',this.value===''?'':Number(this.value))">${timeOptsWithNone(s.os,9,23)}</select><span>〜</span><select onchange="setStaff('oe',this.value===''?'':Number(this.value))">${timeOptsWithNone(s.oe,9,23)}</select></div><div class="otherModeNote">未記入ならメイン時間と同じ。入力がある場合は土日祝だけこちらを優先。両方入力＝範囲内で調整／開始だけ＝出勤時間固定／終了だけ＝退勤時間固定。固定ON＋両方入力なら完全固定。</div></div>
     <div class="wide"><label>ランク</label><select onchange="setStaff('rank',this.value)"><option value="" ${!s.rank?'selected':''}>未設定</option><option ${s.rank==='A'?'selected':''}>A</option><option ${s.rank==='B'?'selected':''}>B</option><option ${s.rank==='C'?'selected':''}>C</option><option ${s.rank==='D'?'selected':''}>D</option><option ${s.rank==='E'?'selected':''}>E</option></select></div>
   </div>
   <div class="skillGroup" style="margin-top:12px">
@@ -3223,7 +3224,7 @@ function toggleSkill(skill,on){
   quickSave();openDetail(editing);renderAll();
 }
 function closeDetail(){detailModal.classList.add('hide');editing=null;renderStaff();renderAll()}
-function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト フリー',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
+function addStaff(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:staffView,employment:'バイト フリー',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',mainFixed:false,weekendFixed:false,weekend:true,half:false,close:false,set:false,max:5});quickSave();renderStaff();renderAll()}
 function deleteStaff(id){if(confirm('削除しますか？')){staff=staff.filter(s=>s.id!==id);delete requests[id];Object.keys(schedule).forEach(k=>delete schedule[k][id]);delete actual[id];quickSave();closeDetail()}}
 function openPreview(){renderPreview();preview.classList.remove('hide')}
 function closePreview(){preview.classList.add('hide')}
@@ -7425,7 +7426,7 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
     staffList.innerHTML=list.length?list.map(s=>`
       <button class="staffBtn" onclick="openDetail('${s.id}')">
         <strong>${s.name}</strong>
-        <div class="meta">${staffCategory(s)} / ${s.bs}:00〜${s.be}:00 / ${s.mainMode||'フリー'}</div>
+        <div class="meta">${staffCategory(s)} / ${s.bs!==''?s.bs+':00':'—'}〜${s.be!==''?s.be+':00':'—'} / ${s.mainFixed?'固定':'調整'}</div>
         <div class="orderBtns" onclick="event.stopPropagation()"><span class="moveBtns"><button class="sec" onclick="moveStaff('${s.id}',-1)">↑</button><button class="sec" onclick="moveStaff('${s.id}',1)">↓</button></span><button class="sec detailText" onclick="openDetail('${s.id}')">詳細 ›</button></div>
       </button>`).join(''):'<p class="note">スタッフがいません。</p>';
   };
@@ -7434,7 +7435,7 @@ window.v148AutoHall=gen;window.v148Validate=validate;window.autoMake=function(ro
     const body=document.getElementById('detailBody'); if(!body) return;
     [...body.querySelectorAll('label')].forEach(l=>{if(l.textContent.trim()==='担当') l.parentElement.style.display='none';});
   };
-  window.addStaff=function(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:'ホール',employment:'バイト フリー',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',weekend:true,half:false,close:false,set:false,max:5,closePriority:false});quickSave();renderStaff();renderAll();};
+  window.addStaff=function(){let id='s'+Date.now();staff.push({id,name:'新規',input:'off',role:'ホール',employment:'バイト フリー',category:'バイト フリー',rank:'C',skills:['新人'],bs:17,be:22,os:'',oe:'',otherMode:'フリー',mainMode:'フリー',mainFixed:false,weekendFixed:false,weekend:true,half:false,close:false,set:false,max:5,closePriority:false});quickSave();renderStaff();renderAll();};
 
   // ---- event-aware coverage ----
   function activeAt(k,h){return HALL().filter(s=>{const p=schedule?.[k]?.[s.id];return p&&p.start<=h&&p.end>h&&!isEventAway(s,k,h);});}
@@ -10460,8 +10461,9 @@ setTimeout(refillStaffNames,0);
 const K=d=>ymd(d), H=()=>staff.filter(s=>s.role==='ホール');
 const EMP=s=>s.employment==='社員'||staffCategory(s)==='社員';
 const CAT=s=>staffCategory(s), EAR=s=>CAT(s)==='バイト 早番';
+const LATE=s=>CAT(s)==='バイト 遅番', FLEX=s=>CAT(s)==='バイト フリー';
 const STU=s=>CAT(s)==='バイト 学生';
-const FREE=s=>['バイト 遅番','バイト フリー'].includes(CAT(s));
+const FREE=s=>LATE(s)||FLEX(s);
 const NEW=s=>(s.skills||[]).includes('新人');
 const SET=s=>!!s.set||(s.skills||[]).includes('セッティング')||(s.skills||[]).includes('仕込み');
 const DR=s=>(s.skills||[]).includes('ドリバ');
@@ -10469,7 +10471,6 @@ const RC=s=>(s.skills||[]).includes('レジ締め');
 const DC=s=>!!s.close||(s.skills||[]).includes('ドリバ締め');
 const R=(s,d)=>requests?.[s.id]?.[K(d)]||{};
 const SH=(s,d)=>schedule?.[K(d)]?.[s.id]||null;
-const MODE=s=>{let m=s.mainMode||'フリー';return m==='固定'?'時間固定':m;};
 const HOL=d=>d.getDay()===0||d.getDay()===6||(typeof prodHolidayName==='function'&&!!prodHolidayName(d));
 const rank=s=>({S:5,A:4,B:3,C:2,D:1,E:0}[s.rank]??1);
 const effRank=s=>Math.max(0,rank(s)-(NEW(s)?1:0));
@@ -10478,7 +10479,7 @@ const paid=(s,d)=>R(s,d).m==='有給';
 const hardOff=(s,d)=>['×','休み希望','有給'].includes(R(s,d).m);
 const softOff=(s,d)=>['△','できれば休み'].includes(R(s,d).m);
 const requested=(s,d)=>['○','出勤希望','時間','時間指定'].includes(R(s,d).m);
-const weekendStart=s=>s.otherMode==='土日祝'&&s.os!==''&&s.os!=null&&Number.isFinite(Number(s.os));
+const hasVal=v=>v!==''&&v!=null&&Number.isFinite(Number(v));
 function dayAvailable(s,d,allowSoft=false){
   if(hardOff(s,d)||(!allowSoft&&softOff(s,d)))return false;
   if(HOL(d)&&s.weekend===false)return false;
@@ -10486,20 +10487,33 @@ function dayAvailable(s,d,allowSoft=false){
   return true;
 }
 function reqRange(s,d){let r=R(s,d);if(!['時間','時間指定'].includes(r.m))return null;let st=(r.ts!==''&&r.ts!=null)?Number(r.ts):(r.d==='from'&&r.h!==''?Number(r.h):null),en=(r.te!==''&&r.te!=null)?Number(r.te):(r.d==='until'&&r.h!==''?Number(r.h):null);return {st:Number.isFinite(st)?st:null,en:Number.isFinite(en)?en:null};}
-function bounds(s,d){
-  let rr=reqRange(s,d),c=closeHour(d),mode=MODE(s),min=Number(s.bs),max=Number(s.be);
-  if(!Number.isFinite(min))min=EMP(s)?11:17;if(!Number.isFinite(max))max=c;
-  if(HOL(d)&&weekendStart(s)){min=Number(s.os);let y=Number(s.oe);if(s.oe!==''&&s.oe!=null&&Number.isFinite(y))max=y;}
-  if(rr?.st!=null)min=rr.st;if(rr?.en!=null)max=rr.en;max=Math.min(c,max);
-  return {min,max,rr,mode};
+// 時間欄の意味を1か所で決める。
+// 両方+固定ON=完全固定 / 両方+固定OFF=勤務可能範囲 / 開始のみ=入り固定 / 終了のみ=上がり固定。
+// 土日祝欄が空ならメイン時間をそのまま使い、1つでも記入があれば土日祝欄を優先する。
+function timeRule(s,d){
+  let weekend=HOL(d)&&(hasVal(s.os)||hasVal(s.oe));
+  let sv=weekend?s.os:s.bs, ev=weekend?s.oe:s.be, fixed=weekend?!!s.weekendFixed:!!s.mainFixed;
+  let st=hasVal(sv)?Number(sv):null, en=hasVal(ev)?Number(ev):null;
+  let rr=reqRange(s,d); if(rr?.st!=null)st=rr.st; if(rr?.en!=null)en=rr.en;
+  let type=(st!=null&&en!=null)?(fixed?'fixed':'range'):(st!=null?'start':(en!=null?'end':'none'));
+  return {st,en,type,weekend,rr};
 }
-function fixedStart(s,d){let b=bounds(s,d);if(b.rr?.st!=null)return b.rr.st;if(HOL(d)&&weekendStart(s))return Number(s.os);if(['時間固定','出勤固定'].includes(b.mode))return b.min;return null;}
-function weekendForced(s,d){return HOL(d)&&weekendStart(s)&&dayAvailable(s,d);}
+function bounds(s,d){
+  let r=timeRule(s,d),c=closeHour(d),min=r.st,max=r.en;
+  if(min==null)min=EMP(s)?11:(EAR(s)?9:(LATE(s)?17:11));
+  if(max==null)max=c;
+  max=Math.min(c,max);
+  return {min,max,rr:r.rr,rule:r};
+}
+function fixedStart(s,d){let r=timeRule(s,d);return (r.type==='fixed'||r.type==='start')?r.st:null;}
+function fixedEnd(s,d){let r=timeRule(s,d);return (r.type==='fixed'||r.type==='end')?Math.min(closeHour(d),r.en):null;}
+function weekendForced(s,d){return HOL(d)&&hasVal(s.os)&&!hasVal(s.oe)&&dayAvailable(s,d);}
 function valid(s,d,st,en,allowSoft=false){
   if(!dayAvailable(s,d,allowSoft)||!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>9)return false;
   if(EMP(s)&&st>13)return false;
-  let b=bounds(s,d),fs=fixedStart(s,d);if(st<b.min||en>b.max)return false;if(fs!=null&&st!==fs)return false;
-  if(b.mode==='時間固定'&&en!==b.max)return false;if(b.mode==='退勤固定'&&en!==b.max)return false;
+  let b=bounds(s,d),r=b.rule,fs=fixedStart(s,d),fe=fixedEnd(s,d);
+  if(r.st!=null&&st<r.st)return false;if(r.en!=null&&en>Math.min(closeHour(d),r.en))return false;
+  if(fs!=null&&st!==fs)return false;if(fe!=null&&en!==fe)return false;
   return true;
 }
 function put(s,d,st,en){schedule[K(d)]??={};schedule[K(d)][s.id]={label:String(st),start:st,end:en};}
@@ -10521,11 +10535,31 @@ function personScore(s,d,st,en){
   return sc;
 }
 function patterns(s,d,allowSoft=false){
-  if(!dayAvailable(s,d,allowSoft))return[];let b=bounds(s,d),c=closeHour(d),out=[],starts=[],fs=fixedStart(s,d);
-  if(fs!=null)starts=[fs];else if(EMP(s))starts=[b.min,11,12,13];else if(EAR(s))starts=[9,11,12,13,14,15,16,17];else if(FREE(s))starts=[11,12,13,14,15,16,17];else if(STU(s))starts=HOL(d)?[11,12,13,14,15,16,17,18]:[13,14,15,16,17,18];else starts=[b.min,11,12,13,14,15,16,17,18];
-  starts=[...new Set(starts.map(Number))].filter(x=>Number.isFinite(x)&&x>=b.min&&x<c);
-  for(const x of starts){let ends=[];if(b.mode==='時間固定'||b.mode==='退勤固定'||b.rr?.en!=null)ends=[b.max];else{let longest=Math.min(b.max,c,x+9);ends=[longest];if(EAR(s))for(const e of [x+4,x+5,x+6,x+7,x+8])if(e<=longest)ends.push(e);}
-    for(const en of [...new Set(ends)])if(valid(s,d,x,en,allowSoft))out.push([x,en]);}
+  if(!dayAvailable(s,d,allowSoft))return[];
+  let b=bounds(s,d),r=b.rule,c=closeHour(d),out=[],starts=[],fs=fixedStart(s,d),fe=fixedEnd(s,d);
+  if(fs!=null) starts=[fs];
+  else if(EMP(s)) starts=[11,12,13];
+  else if(EAR(s)) starts=[9,11];
+  else if(LATE(s)) starts=[17,18];
+  else if(FLEX(s)) starts=[11,12,13,14,15,16,17,18];
+  else if(STU(s)) starts=HOL(d)?[11,12,13,14,15,16,17,18]:[17,18];
+  else starts=[11,12,13,14,15,16,17,18];
+  // 土日祝に開始・終了の両方が入っている場合は「その範囲内で自由」。カテゴリの通常入り候補に加え範囲内の時刻も候補化。
+  if(r.weekend&&r.type==='range') for(let h=Math.ceil(r.st);h<Math.min(c,r.en);h++) starts.push(h);
+  starts=[...new Set(starts.map(Number))].filter(x=>Number.isFinite(x)&&x>=b.min&&x<c&&(r.en==null||x<r.en));
+  for(const x of starts){
+    let ends=[];
+    if(fe!=null) ends=[fe];
+    else {
+      let longest=Math.min(b.max,c,x+9);
+      if(longest>x) ends.push(longest);
+      // 早番は有効な勤務時間を活かす。短縮候補も持つが、入りは9/11から動かさない。
+      if(EAR(s)) for(const e of [x+4,x+5,x+6,x+7,x+8]) if(e<=longest) ends.push(e);
+      // 完全固定は入力された終了だけ。
+      if(r.type==='fixed') ends=[Math.min(c,r.en)];
+    }
+    for(const en of [...new Set(ends)]) if(valid(s,d,x,en,allowSoft)) out.push([x,en]);
+  }
   return out;
 }
 function patternUtility(s,d,p){
@@ -10593,7 +10627,7 @@ function repairEmployeeEightOff(){
   // 休み過多: 出勤可能な休み日に戻す。公休8回は社員全員同じ基準。有給は別枠。
   for(const e of es){let guard=0;while(employeeOffCount(e)>8&&guard++<40){let cand=dates.filter(d=>!SH(e,d)&&!paid(e,d)&&dayAvailable(e,d)&&runIfAdd(e,d)<=Number(e.max||6)).map(d=>({d,p:bestPattern(e,d)})).filter(x=>x.p).sort((a,b)=>employeeCount(a.d)-employeeCount(b.d)||(HOL(a.d)?-1:1));if(!cand.length)break;put(e,cand[0].d,...cand[0].p);}}
   // 休み不足: その社員を外しても社員2人・イベント・強制土日入り・必要人数を壊さない日から休ませる。
-  for(const e of es){let guard=0;while(employeeOffCount(e)<8&&guard++<40){let cand=dates.filter(d=>SH(e,d)&&!paid(e,d)&&!eventAttend?.[K(d)]?.[e.id]&&!weekendForced(e,d)&&!requested(e,d)).map(d=>{let p=SH(e,d),safeEmp=employeeCount(d)>2,loss=0;for(let h=p.start;h<p.end;h++)loss+=Math.max(0,requiredHead(d,h)-active(d,h,e.id).length)*500;return {d,sc:(HOL(d)?900:0)+loss+(safeEmp?0:3000)};}).sort((a,b)=>a.sc-b.sc);let pick=cand.find(x=>x.sc<3000);if(!pick)break;del(e,pick.d);addForCoverage(pick.d,false);ensureLateB();}}
+  for(const e of es){let guard=0;while(employeeOffCount(e)<8&&guard++<40){let cand=dates.filter(d=>SH(e,d)&&!paid(e,d)&&!HOL(d)&&!eventAttend?.[K(d)]?.[e.id]&&!weekendForced(e,d)&&!requested(e,d)).map(d=>{let p=SH(e,d),safeEmp=employeeCount(d)>2,loss=0;for(let h=p.start;h<p.end;h++)loss+=Math.max(0,requiredHead(d,h)-active(d,h,e.id).length)*500;return {d,sc:(HOL(d)?900:0)+loss+(safeEmp?0:3000)};}).sort((a,b)=>a.sc-b.sc);let pick=cand.find(x=>x.sc<3000);if(!pick)break;del(e,pick.d);addForCoverage(pick.d,false);ensureLateB();}}
 }
 function breakRuns(){
   for(const s of H()){let lim=Number(s.max||6),guard=0;while(maxRun(s)>lim&&guard++<20){let choices=dates.filter(d=>SH(s,d)&&!eventAttend?.[K(d)]?.[s.id]&&!requested(s,d)&&!weekendForced(s,d)&&!(Number(SH(s,d).start)===9&&SET(s)&&active(d,9,s.id).filter(SET).length===0)).sort((a,b)=>(HOL(a)?1:0)-(HOL(b)?1:0)||active(b,STU(s)?18:13,s.id).length-active(a,STU(s)?18:13,s.id).length);if(!choices.length)break;del(s,choices[0]);}}
