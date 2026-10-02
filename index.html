@@ -9954,7 +9954,7 @@ body.prodStaffMode #preview.v33-staff-preview{display:flex!important;z-index:999
   if(!p?.dates?.length||!p?.staff)return'<tr><td>まだシフトは公開されていません</td></tr>';
   const hs=p.staff.filter(s=>s.role==='ホール');
   const evr='<tr><th></th>'+p.dates.map(k=>`<th><div class="previewEvent">${E(pubEvent(p,k))}</div></th>`).join('')+'</tr>';
-  const hdr='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');const holiday=(typeof prodHolidayName==='function'&&!!prodHolidayName(d))||(typeof prodHolidayLike==='function'&&!!prodHolidayLike(d));const dayClass=d.getDay()===0||holiday?'shift-date-red':d.getDay()===6?'shift-date-blue':'';return `<th class="${dayClass}">${d.getDate()}<br>${W[d.getDay()]}</th>`}).join('')+'</tr>';
+  const hdr='<tr><th></th>'+p.dates.map(k=>{const d=new Date(k+'T00:00:00');const holiday=typeof prodHolidayName==='function'&&!!prodHolidayName(d);const dayClass=d.getDay()===0||holiday?'shift-date-red':d.getDay()===6?'shift-date-blue':'';return `<th class="${dayClass}">${d.getDate()}<br>${W[d.getDay()]}</th>`}).join('')+'</tr>';
   const grp=s=>s.employment==='社員'||s.category==='社員'?'社員':String(s.category||s.employment||'').includes('早番')?'早番':String(s.category||s.employment||'').match(/フリー|遅番/)?'フリー':'学生';
   let rows='',prev='';
   hs.forEach(s=>{const g=grp(s);if(prev&&g!==prev)rows+=`<tr class="groupGap"><td colspan="${p.dates.length+1}"></td></tr>`;prev=g;rows+='<tr><td>'+E(s.name)+'</td>'+p.dates.map(k=>{const q=p.schedule?.[k]?.[s.id],ck=q&&p.eventAttend?.[k]?.[s.id]?' ✓':'';let z;if(q)z=E(q.label??q.start)+ck;else if(typeof window.vUnifiedHallMark==='function'&&p.schedule===schedule)z=E(window.vUnifiedHallMark(s,k));else z='／';return `<td>${z}</td>`}).join('')+'</tr>'});
@@ -11100,6 +11100,59 @@ function settleEmployeeOff(){
     }
   }
 }
+// Final employee-off acceptance: change only employee attendance; never relax coverage.
+// Run after all staffing adjustments, so subsequent repairs cannot silently undo 8 public offs.
+function enforceEmployeeEightOffFinal(){
+  const es=H().filter(EMP);
+  const snap=()=>JSON.parse(JSON.stringify(dates.map(d=>[K(d),schedule[K(d)]])));
+  const undo=state=>{for(const [k,day] of state)schedule[k]=day;activeHourCache.clear();workdayCache.clear();};
+  const dayState=d=>{
+    const hours={};for(let h=9;h<C(d);h++){
+      const a=active(d,h);hours[h]={n:a.length,dr:a.some(DR),close:a.some(x=>DC(x)||RC(x)||EMP(x))};
+    }
+    return {hours,emp:employeeCount(d),e11:H().filter(x=>EMP(x)&&SH(x,d)&&Number(SH(x,d).start)===11).length,
+      open:active(d,9).filter(SET).length,late:lateBPresent(d)};
+  };
+  const noRegression=(d,b)=>{
+    if(employeeCount(d)<2||active(d,9).filter(SET).length<Math.max(1,b.open))return false;
+    if(H().filter(x=>EMP(x)&&SH(x,d)&&Number(SH(x,d).start)===11).length>Math.max(1,b.e11))return false;
+    for(let h=9;h<C(d);h++){
+      const a=active(d,h),was=b.hours[h];
+      if(a.length<Math.min(was.n,requiredHead(d,h)))return false;
+      if(was.dr&&!a.some(DR))return false;
+      if(was.close&&!a.some(x=>DC(x)||RC(x)||EMP(x)))return false;
+      if(HOL(d)&&h>=11&&a.length>(h===11?4:7))return false;
+    }
+    return !b.late||lateBPresent(d);
+  };
+  // First restore excess public offs, prioritizing weekends and days with fewer employees.
+  for(const e of es){let guard=0;while(employeeOffCount(e)>8&&guard++<dates.length){
+    const opts=dates.filter(d=>!SH(e,d)&&!paid(e,d)&&!hardOff(e,d)&&dayAvailable(e,d)&&runIfAdd(e,d)<=Number(e.max||6))
+      .sort((a,b)=>Number(HOL(b))-Number(HOL(a))||employeeCount(a)-employeeCount(b));
+    let changed=false;
+    for(const d of opts){const before=snap(),base=dayState(d);
+      for(const p of rankedPatterns(e,d,patterns(e,d))){
+        if(!put(e,d,...p))continue;
+        if(maxRun(e)<=Number(e.max||6)&&noRegression(d,base)) {changed=true;break;}
+        undo(before);
+      }
+      if(changed)break;undo(before);
+    }
+    if(!changed)break;
+  }}
+  // Then create missing offs only on days with at least three employees; prefer weekdays.
+  // Never override requested work, event attendance, paid leave, or weekend-forced shifts.
+  for(const e of es){let guard=0;while(employeeOffCount(e)<8&&guard++<dates.length){
+    const opts=dates.filter(d=>SH(e,d)&&!paid(e,d)&&!requested(e,d)&&!eventAttend?.[K(d)]?.[e.id]
+      &&!weekendForced(e,d)&&employeeCount(d)>=3).sort((a,b)=>Number(HOL(a))-Number(HOL(b)));
+    let changed=false;
+    for(const d of opts){const before=snap(),base=dayState(d);del(e,d);
+      if(noRegression(d,base)&&maxRun(e)<=Number(e.max||6)){changed=true;break;}
+      undo(before);
+    }
+    if(!changed)break;
+  }}
+}
 function normalize(){for(const d of dates)for(const s of H()){const p=SH(s,d);if(p&&!valid(s,d,Number(p.start),Number(p.end)))del(s,d);}}
 function balanceScarceWorkers(){
   // 月間全体で出勤機会を比較。現在の人数・開店・夜B・締め・希望・連勤を壊す交換は禁止。
@@ -11449,7 +11502,8 @@ function generate(){
     for(const [key,day] of finalBefore)schedule[key]=day;
     // Rollback replaces whole day objects; discard all derived cache entries.
     activeHourCache.clear();workdayCache.clear();
-  }
+  }  // Strictly last: no subsequent staffing step may change employee public offs.
+  enforceEmployeeEightOffFinal();
 }
 window.vUnifiedHallValidate=issues;
 window.vUnifiedHallAuto=async function(){
