@@ -10525,6 +10525,8 @@ function fixedEnd(s,d){const r=timeRule(s,d);return (r.type==='fixed'||r.type===
 function weekendForced(s,d){return HOL(d)&&hasVal(s.os)&&!hasVal(s.oe)&&dayAvailable(s,d);}
 function valid(s,d,st,en,allowSoft=false){
   if(!dayAvailable(s,d,allowSoft)||!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>(EMP(s)?9:MAXH(d)))return false;
+  // バイトフリーのみ、17時を超える出勤開始は認めない（17時開始は可）。
+  if(FLEX(s)&&st>17)return false;
   if(st<11&&active(d,9,s.id).length>0)return false;
   if(FLEX(s)&&st===9&&H().some(x=>x.id!==s.id&&EAR(x)&&SET(x)&&dayAvailable(x,d)&&(!hasVal(timeRule(x,d).st)||Number(timeRule(x,d).st)<=9)&&(!hasVal(timeRule(x,d).en)||Number(timeRule(x,d).en)>9)))return false;
   if(EMP(s)&&(st<11||st>13))return false;
@@ -10618,7 +10620,7 @@ function candidateStarts(s,d,b,r){
   if(EMP(s))return[11,12,13];
   if(EAR(s))return[9,11];
   if(LATE(s))return[17,18];
-  if(FLEX(s))return[9,11,12,13,14,15,16,17,18];
+  if(FLEX(s))return[9,11,12,13,14,15,16,17];
   if(STU(s))return HOL(d)?[11,12,13,14,15,16,17,18]:[17,18];
   return[11,12,13,14,15,16,17,18];
 }
@@ -10729,9 +10731,17 @@ function assignEmployees(){
 function ensureOpening(){
   for(const d of dates){
     let open=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9&&SET(s));
-    if(!open.length){const c=H().filter(s=>SET(s)&&!SH(s,d)&&dayAvailable(s,d)&&runIfAdd(s,d)<=Number(s.max||6)).map(s=>({s,p:patterns(s,d).find(p=>p[0]===9)})).filter(x=>x.p).sort((a,b)=>workDays(a.s)-workDays(b.s)||effRank(b.s)-effRank(a.s));if(c.length)put(c[0].s,d,...c[0].p);open=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9&&SET(s));}
+    if(!open.length){const c=H().filter(s=>SET(s)&&!SH(s,d)&&dayAvailable(s,d)&&runIfAdd(s,d)<=Number(s.max||6)).map(s=>({s,p:patterns(s,d).find(p=>p[0]===9)})).filter(x=>x.p).sort((a,b)=>{
+      // 9時担当だけの優先順位。土日祝は最大3連勤、平日は最大6連勤を優先。
+      // 勤務可能・前月からの連勤は候補生成とrunIfAddで先に判定済み。
+      const priority=x=>HOL(d)?(Number(x.s.max||6)<=3?0:1):(Number(x.s.max||6)>=6?0:1);
+      return priority(a)-priority(b)||workDays(a.s)-workDays(b.s)||effRank(b.s)-effRank(a.s);
+    });if(c.length)put(c[0].s,d,...c[0].p);open=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9&&SET(s));}
     // 9時は最低1人。余分な9時入りは、開始固定でなければ11時へ移せる時だけ移す。削除はしない。
-    if(open.length){const keeper=open[0];for(const x of H().filter(s=>s.id!==keeper.id&&SH(s,d)&&Number(SH(s,d).start)===9)){const alt=rankedPatterns(x,d,patterns(x,d).filter(q=>q[0]>=11))[0];if(alt)put(x,d,...alt);else { /* 固定開始・出勤希望を含め、代替時間がない9時担当は消さず最終検証へ残す。 */ }}}
+    if(open.length){
+      const preferred=x=>HOL(d)?(Number(x.max||6)<=3?0:1):(Number(x.max||6)>=6?0:1);
+      const keeper=[...open].sort((a,b)=>preferred(a)-preferred(b)||workDays(a)-workDays(b))[0];
+      for(const x of H().filter(s=>s.id!==keeper.id&&SH(s,d)&&Number(SH(s,d).start)===9)){const alt=rankedPatterns(x,d,patterns(x,d).filter(q=>q[0]>=11))[0];if(alt)put(x,d,...alt);else { /* 固定開始・出勤希望を含め、代替時間がない9時担当は消さず最終検証へ残す。 */ }}}
   }
 }
 // 最初の不足補充より前に、早番・学生・フリーを同じ候補集合で比較する。
@@ -11602,6 +11612,8 @@ function rebalanceNineOclockOnly(){
 // 土日祝・祝前日: 出勤可能者を休みにする前に、既存者の時間調整を試す。
 // 社員の公休・希望休、早番9時、11時4人、同時7人、必要技能を保護する。
 function reconcileWeekendAttendanceFinal(){
+  // 土日祝・祝前日: 出勤可能者を全員検討。休みにする前に勤務時間を調整する。
+  // 既存の勤務日、社員の公休・希望休、9時担当、11時上限4人、以降7人と技能を維持。
   const special=d=>HOL(d)||PREHOL(d);
   const maxAt=h=>h===11?4:7;
   const head=d=>{const v={};for(let h=9;h<C(d);h++){
@@ -11620,7 +11632,6 @@ function reconcileWeekendAttendanceFinal(){
     }return true;
   };
   for(const d of dates){if(!special(d))continue;
-    // 既存の土日祝勤務は削除しない。未配置者を勤務可能日数が少ない順に検討。
     const waiting=H().filter(s=>!EMP(s)&&!SH(s,d)&&dayAvailable(s,d))
       .sort((a,b)=>availabilityDays(a)-availabilityDays(b)||workDays(a)-workDays(b)||effRank(b)-effRank(a));
     for(const s of waiting){
@@ -11629,27 +11640,41 @@ function reconcileWeekendAttendanceFinal(){
       if(!opts.length)continue;
       const base=head(d);
       let placed=false;
-      // 1. まず時間を動かさずに本人を追加する。
       for(const p of opts){if(!put(s,d,...p))continue;
         if(acceptable(d,base)){placed=true;break;}del(s,d);
       }
       if(placed)continue;
-      // 2. 人数の重なりを避けるため既存バイト1人の時間を先にずらす。
-      // 希望時間・固定時間・9時仕込み・社員は変更しない。
+      // 1人の時間調整で入れなければ、既存バイト2人まで組み合わせて調整する。
+      // 希望時間・固定時間・9時担当・社員の勤務は動かさない。
       const movers=H().filter(x=>!EMP(x)&&x.id!==s.id&&SH(x,d)&&!requested(x,d)&&
         fixedStart(x,d)==null&&fixedEnd(x,d)==null&&Number(SH(x,d).start)!==9);
-      outer:for(const mover of movers){
-        const old={...SH(mover,d)};
-        const alternatives=rankedPatterns(mover,d,patterns(mover,d).filter(p=>p[0]!==old.start||p[1]!==old.end));
-        for(const q of alternatives){if(!put(mover,d,...q))continue;
-          for(const p of opts){if(!put(s,d,...p))continue;
-            if(acceptable(d,base)&&maxRun(mover)<=Number(mover.max||6)){
-              placed=true;break outer;
-            }del(s,d);
-          }put(mover,d,old.start,old.end);
-        }put(mover,d,old.start,old.end);
+      const originals=new Map(movers.map(x=>[x.id,{...SH(x,d)}]));
+      const alternatives=x=>rankedPatterns(x,d,patterns(x,d).filter(p=>{
+        const old=originals.get(x.id);return p[0]!==old.start||p[1]!==old.end;
+      })).slice(0,12);
+      const tryAdd=()=>{for(const p of opts){if(!put(s,d,...p))continue;
+        if(acceptable(d,base)){placed=true;return true;}del(s,d);
+      }return false;};
+      outer:for(let i=0;i<movers.length;i++){
+        const x=movers[i],xo=originals.get(x.id);
+        for(const q of alternatives(x)){
+          if(!put(x,d,...q))continue;
+          if(maxRun(x)<=Number(x.max||6)&&tryAdd())break outer;
+          // 2人を動かす必要がある場合のみ探索する。
+          for(let j=i+1;j<movers.length;j++){
+            const y=movers[j],yo=originals.get(y.id);
+            for(const r of alternatives(y)){
+              if(!put(y,d,...r))continue;
+              if(maxRun(y)<=Number(y.max||6)&&maxRun(x)<=Number(x.max||6)&&tryAdd())break outer;
+              put(y,d,yo.start,yo.end);
+            }
+            put(y,d,yo.start,yo.end);
+          }
+          put(x,d,xo.start,xo.end);
+        }
+        put(x,d,xo.start,xo.end);
       }
-      if(!placed){del(s,d); /* cannot safely fit: leave off rather than violate limits */}
+      if(!placed){del(s,d);for(const x of movers){const o=originals.get(x.id);if(o)put(x,d,o.start,o.end);}}
     }
   }
 }
