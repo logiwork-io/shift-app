@@ -11103,30 +11103,32 @@ function settleEmployeeOff(){
 // Employee-only invariant: exactly one employee must START at 11:00 every day.
 // Never change an employee's public-off count to repair the start time.
 function ensureEmployeeElevenFinal(){
-  const employees=H().filter(EMP);
-  const snapshot=()=>JSON.parse(JSON.stringify(dates.map(d=>[K(d),schedule[K(d)]])));
-  const restore=state=>{for(const [key,day] of state)schedule[key]=day;activeHourCache.clear();workdayCache.clear();};
+  // Only adjust the start time of an already-working employee. Never touch
+  // requested days off, paid leave, or the number of employee public days off.
+  const es=H().filter(EMP);
+  const snap=()=>JSON.parse(JSON.stringify(schedule));
+  const restore=x=>{schedule=x;activeHourCache.clear();workdayCache.clear();};
+  const starts=d=>es.filter(e=>SH(e,d)&&Number(SH(e,d).start)===11);
   for(const d of dates){
-    const starts=()=>employees.filter(e=>SH(e,d)&&Number(SH(e,d).start)===11);
-    if(starts().length===1)continue;
-    // An existing working employee can change start without changing any public off.
-    if(starts().length===0){
-      const baseIssues=new Set(issues().filter(x=>x.startsWith(K(d)+':')&&!x.includes('社員11時')));
-      const original= snapshot();let fixed=false;
-      for(const e of employees.filter(x=>SH(x,d))){
-        const old=SH(e,d);if(fixedEnd(e,d)!=null&&fixedEnd(e,d)<=11)continue;
-        for(const p of rankedPatterns(e,d,patterns(e,d).filter(p=>p[0]===11))){
-          if(!put(e,d,...p))continue;
-          const fresh=issues().filter(x=>x.startsWith(K(d)+':')&&!x.includes('社員11時')&&!baseIssues.has(x));
-          if(starts().length===1&&fresh.length===0&&maxRun(e)<=Number(e.max||6)){fixed=true;break;}
-          restore(original);
-        }
-        if(fixed)break;
+    if(starts(d).length===1)continue;
+    if(starts(d).length>1)continue; // Existing duplicate: report; never delete a workday.
+    const baseline=new Set(issues().filter(x=>x.startsWith(K(d)+':')&&!x.includes('社員11時')));
+    const original=snap();let done=false;
+    // Keep employee attendance intact. Prefer a shift that preserves the
+    // existing end time, then consider other legal 11:00 patterns.
+    for(const e of es.filter(e=>SH(e,d)&&fixedStart(e,d)==null)){
+      const old=SH(e,d);
+      const candidates=patterns(e,d).filter(p=>p[0]===11).sort((a,b)=>
+        Number(b[1]===old.end)-Number(a[1]===old.end)||Math.abs(a[1]-old.end)-Math.abs(b[1]-old.end));
+      for(const p of candidates){
         restore(original);
+        if(!put(e,d,...p))continue;
+        const introduced=issues().filter(x=>x.startsWith(K(d)+':')&&!x.includes('社員11時')&&!baseline.has(x));
+        if(starts(d).length===1&&introduced.length===0){done=true;break;}
       }
+      if(done)break;
     }
-    // More than one 11:00 employee is already rejected by valid(), and is
-    // reported instead of silently deleting a shift or an employee workday.
+    if(!done)restore(original);
   }
 }
 // Final employee-off acceptance: change only employee attendance; never relax coverage.
@@ -11534,7 +11536,62 @@ function generate(){
     activeHourCache.clear();workdayCache.clear();
   }  // Strictly last: no subsequent staffing step may change employee public offs.
   enforceEmployeeEightOffFinal();
+  reconcileWeekendAttendanceFinal();
   ensureEmployeeElevenFinal();
+}
+// 土日祝・祝前日: 出勤可能者を休みにする前に、既存者の時間調整を試す。
+// 社員の公休・希望休、早番9時、11時4人、同時7人、必要技能を保護する。
+function reconcileWeekendAttendanceFinal(){
+  const special=d=>HOL(d)||PREHOL(d);
+  const maxAt=h=>h===11?4:7;
+  const head=d=>{const v={};for(let h=9;h<C(d);h++){
+    const a=active(d,h);v[h]={n:a.length,dr:a.some(DR),close:a.some(x=>DC(x)||RC(x)||EMP(x))};
+  }return {v,late:lateBPresent(d),emp:employeeCount(d),e11:H().filter(s=>EMP(s)&&SH(s,d)&&Number(SH(s,d).start)===11).length};};
+  const acceptable=(d,base)=>{
+    if(employeeCount(d)!==base.emp)return false;
+    if(H().filter(s=>EMP(s)&&SH(s,d)&&Number(SH(s,d).start)===11).length!==base.e11)return false;
+    if(active(d,9).length!==1||active(d,10).length!==1||!active(d,9).some(SET))return false;
+    if(base.late&&!lateBPresent(d))return false;
+    for(let h=11;h<C(d);h++){
+      const a=active(d,h),old=base.v[h];
+      if(a.length>maxAt(h)||a.length<Math.min(old.n,requiredHead(d,h)))return false;
+      if(old.dr&&!a.some(DR))return false;
+      if(old.close&&h>=20&&!a.some(s=>DC(s)||RC(s)||EMP(s)))return false;
+    }return true;
+  };
+  for(const d of dates){if(!special(d))continue;
+    // 既存の土日祝勤務は削除しない。未配置者を勤務可能日数が少ない順に検討。
+    const waiting=H().filter(s=>!EMP(s)&&!SH(s,d)&&dayAvailable(s,d))
+      .sort((a,b)=>availabilityDays(a)-availabilityDays(b)||workDays(a)-workDays(b)||effRank(b)-effRank(a));
+    for(const s of waiting){
+      if(runIfAdd(s,d)>Number(s.max||6))continue;
+      const opts=rankedPatterns(s,d,patterns(s,d));
+      if(!opts.length)continue;
+      const base=head(d);
+      let placed=false;
+      // 1. まず時間を動かさずに本人を追加する。
+      for(const p of opts){if(!put(s,d,...p))continue;
+        if(acceptable(d,base)){placed=true;break;}del(s,d);
+      }
+      if(placed)continue;
+      // 2. 人数の重なりを避けるため既存バイト1人の時間を先にずらす。
+      // 希望時間・固定時間・9時仕込み・社員は変更しない。
+      const movers=H().filter(x=>!EMP(x)&&x.id!==s.id&&SH(x,d)&&!requested(x,d)&&
+        fixedStart(x,d)==null&&fixedEnd(x,d)==null&&Number(SH(x,d).start)!==9);
+      outer:for(const mover of movers){
+        const old={...SH(mover,d)};
+        const alternatives=rankedPatterns(mover,d,patterns(mover,d).filter(p=>p[0]!==old.start||p[1]!==old.end));
+        for(const q of alternatives){if(!put(mover,d,...q))continue;
+          for(const p of opts){if(!put(s,d,...p))continue;
+            if(acceptable(d,base)&&maxRun(mover)<=Number(mover.max||6)){
+              placed=true;break outer;
+            }del(s,d);
+          }put(mover,d,old.start,old.end);
+        }put(mover,d,old.start,old.end);
+      }
+      if(!placed){del(s,d); /* cannot safely fit: leave off rather than violate limits */}
+    }
+  }
 }
 function employeeOnlyWarnings(){
   const out=[];
