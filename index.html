@@ -10524,7 +10524,7 @@ function fixedEnd(s,d){const r=timeRule(s,d);return (r.type==='fixed'||r.type===
 // 土日祝「開始だけ」は出勤固定。終了だけ/範囲は出勤そのものの強制ではない。
 function weekendForced(s,d){return HOL(d)&&hasVal(s.os)&&!hasVal(s.oe)&&dayAvailable(s,d);}
 function valid(s,d,st,en,allowSoft=false){
-  if(!dayAvailable(s,d,allowSoft)||!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>MAXH(d))return false;
+  if(!dayAvailable(s,d,allowSoft)||!Number.isFinite(st)||!Number.isFinite(en)||en<=st||en-st>(EMP(s)?9:MAXH(d)))return false;
   if(st<11&&active(d,9,s.id).length>0)return false;
   if(FLEX(s)&&st===9&&H().some(x=>x.id!==s.id&&EAR(x)&&SET(x)&&dayAvailable(x,d)&&(!hasVal(timeRule(x,d).st)||Number(timeRule(x,d).st)<=9)&&(!hasVal(timeRule(x,d).en)||Number(timeRule(x,d).en)>9)))return false;
   if(EMP(s)&&(st<11||st>13))return false;
@@ -11100,6 +11100,35 @@ function settleEmployeeOff(){
     }
   }
 }
+// Employee-only invariant: exactly one employee must START at 11:00 every day.
+// Never change an employee's public-off count to repair the start time.
+function ensureEmployeeElevenFinal(){
+  const employees=H().filter(EMP);
+  const snapshot=()=>JSON.parse(JSON.stringify(dates.map(d=>[K(d),schedule[K(d)]])));
+  const restore=state=>{for(const [key,day] of state)schedule[key]=day;activeHourCache.clear();workdayCache.clear();};
+  for(const d of dates){
+    const starts=()=>employees.filter(e=>SH(e,d)&&Number(SH(e,d).start)===11);
+    if(starts().length===1)continue;
+    // An existing working employee can change start without changing any public off.
+    if(starts().length===0){
+      const baseIssues=new Set(issues().filter(x=>x.startsWith(K(d)+':')&&!x.includes('社員11時')));
+      const original= snapshot();let fixed=false;
+      for(const e of employees.filter(x=>SH(x,d))){
+        const old=SH(e,d);if(fixedEnd(e,d)!=null&&fixedEnd(e,d)<=11)continue;
+        for(const p of rankedPatterns(e,d,patterns(e,d).filter(p=>p[0]===11))){
+          if(!put(e,d,...p))continue;
+          const fresh=issues().filter(x=>x.startsWith(K(d)+':')&&!x.includes('社員11時')&&!baseIssues.has(x));
+          if(starts().length===1&&fresh.length===0&&maxRun(e)<=Number(e.max||6)){fixed=true;break;}
+          restore(original);
+        }
+        if(fixed)break;
+        restore(original);
+      }
+    }
+    // More than one 11:00 employee is already rejected by valid(), and is
+    // reported instead of silently deleting a shift or an employee workday.
+  }
+}
 // Final employee-off acceptance: change only employee attendance; never relax coverage.
 // Run after all staffing adjustments, so subsequent repairs cannot silently undo 8 public offs.
 function enforceEmployeeEightOffFinal(){
@@ -11115,6 +11144,7 @@ function enforceEmployeeEightOffFinal(){
   };
   const noRegression=(d,b)=>{
     if(employeeCount(d)<2||active(d,9).filter(SET).length<Math.max(1,b.open))return false;
+    if(b.e11===1&&H().filter(x=>EMP(x)&&SH(x,d)&&Number(SH(x,d).start)===11).length!==1)return false;
     if(H().filter(x=>EMP(x)&&SH(x,d)&&Number(SH(x,d).start)===11).length>Math.max(1,b.e11))return false;
     for(let h=9;h<C(d);h++){
       const a=active(d,h),was=b.hours[h];
@@ -11144,7 +11174,7 @@ function enforceEmployeeEightOffFinal(){
   // Never override requested work, event attendance, paid leave, or weekend-forced shifts.
   for(const e of es){let guard=0;while(employeeOffCount(e)<8&&guard++<dates.length){
     const opts=dates.filter(d=>SH(e,d)&&!paid(e,d)&&!requested(e,d)&&!eventAttend?.[K(d)]?.[e.id]
-      &&!weekendForced(e,d)&&employeeCount(d)>=3).sort((a,b)=>Number(HOL(a))-Number(HOL(b)));
+      &&employeeCount(d)>=3&&!(Number(SH(e,d).start)===11&&H().filter(x=>EMP(x)&&x.id!==e.id&&SH(x,d)&&Number(SH(x,d).start)===11).length===0)).sort((a,b)=>Number(HOL(a))-Number(HOL(b)));
     let changed=false;
     for(const d of opts){const before=snap(),base=dayState(d);del(e,d);
       if(noRegression(d,base)&&maxRun(e)<=Number(e.max||6)){changed=true;break;}
@@ -11431,12 +11461,12 @@ function issues(){
     for(const s of H()){const p=SH(s,d);if(p&&!valid(s,d,Number(p.start),Number(p.end)))out.push(`${k}:${s.name} 時間条件違反`);if(p&&Number(p.start)>18&&!explicitLateRequest(s,d))out.push(`${k}:${s.name} 18時超の希望外出勤`);if(weekendForced(s,d)&&!p)out.push(`${k}:${s.name} 土日祝入り固定なのに未出勤`);}
     if(employeeCount(d)<2)out.push(`${k}:社員${employeeCount(d)}人`);
     const e11=H().filter(s=>EMP(s)&&SH(s,d)&&Number(SH(s,d).start)===11).length;
-    if(e11>1)out.push(`${k}:社員11時同時出勤${e11}人`);
+    if(e11!==1)out.push(`${k}:社員11時開始${e11}人（必ず1人）`);
     const earlyCount=H().filter(s=>EAR(s)&&SH(s,d)).length;
     if(earlyCount>3)out.push(`${k}:早番バイト${earlyCount}人（上限3人）`);
     for(let h=11;h<C(d);h++){if(active(d,h).length<requiredHead(d,h))out.push(`${k}:${h}時人数不足 ${active(d,h).length}/${requiredHead(d,h)}`);}
     for(const h of [18,19,20,21,22].filter(h=>h<C(d))){const at=active(d,h);if(!at.some(DR))out.push(`${k}:${h}時ドリバ不足`);if(h>=20&&!at.some(s=>DC(s)||RC(s)||EMP(s)))out.push(`${k}:${h}時締めスキル不足`);}
-    if(HOL(d))for(const e of H().filter(EMP)){if(dayAvailable(e,d)&&!SH(e,d)&&employeeOffCount(e)>8)out.push(`${k}:${e.name} 土日祝公休・8休調整未完了`);}
+    if(HOL(d))for(const e of H().filter(EMP)){if(dayAvailable(e,d)&&!SH(e,d)&&employeeCount(d)<2)out.push(`${k}:${e.name} 土日祝公休時の社員不足`);}
     if(HOL(d))for(let h=11;h<C(d);h++){const n=active(d,h).length,lim=h===11?4:7;if(n>lim)out.push(`${k}:${h}時${n}人（最大${lim}）`);}
     if(H().some(s=>PTB(s)&&dayAvailable(s,d)&&patterns(s,d).some(p=>p[0]<=19&&p[1]>=C(d)))&&!lateBPresent(d))out.push(`${k}:遅番B以上バイト不在`);
     const ev=events?.[k]||{},t=(ev.start===''||ev.start==null)&&(ev.time===''||ev.time==null)?NaN:Number(ev.start!==''&&ev.start!=null?ev.start:ev.time);if(Number.isFinite(t))for(const e of H().filter(s=>EMP(s)&&eventAttend?.[k]?.[s.id])){const p=SH(e,d);if(!p||p.start>t||p.end<=t)out.push(`${k}:${e.name} イベント開始時不在`);}
@@ -11504,7 +11534,30 @@ function generate(){
     activeHourCache.clear();workdayCache.clear();
   }  // Strictly last: no subsequent staffing step may change employee public offs.
   enforceEmployeeEightOffFinal();
+  ensureEmployeeElevenFinal();
 }
+function employeeOnlyWarnings(){
+  const out=[];
+  for(const e of H().filter(EMP)){
+    const off=employeeOffCount(e);
+    if(off<8)out.push(`${e.name}の休みが${8-off}回足りてない`);
+    // Paid leave is separate from public offs. Count actual working days only.
+    const worked=dates.filter(d=>!!SH(e,d));
+    const actual=worked.reduce((sum,d)=>{
+      const p=SH(e,d);return sum+Math.max(0,Number(p.end)-Number(p.start)-1);
+    },0);
+    const overtime=Math.max(0,actual-worked.length*8);
+    if(overtime>=30)out.push(`${e.name}の残業時間が超える予想`);
+  }
+  return out;
+}
+window.vUnifiedEmployeeWarnings=employeeOnlyWarnings;
+window.renderWarnings=function(){
+  const target=typeof warnings!=='undefined'?warnings:document.getElementById('warnings');
+  if(!target)return;
+  const items=employeeOnlyWarnings();
+  target.innerHTML=items.length?items.map(x=>`<div class="item"><span style="color:#d95656;font-weight:800">!</span><span>${x.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span></div>`).join(''):'<p style="color:#2d8f74;font-weight:800">社員の公休・残業予測の警告はありません。</p>';
+};
 window.vUnifiedHallValidate=issues;
 window.vUnifiedHallAuto=async function(){
   // Generation must complete and be persisted locally before attempting remote save.
@@ -11519,18 +11572,9 @@ window.vUnifiedHallAuto=async function(){
       console.error('自動生成後のクラウド保存に失敗',error);
     }
   }
-  const days=new Set();
-  for(const issue of window.vUnifiedHallIssues){
-    const found=issue.match(/\d{4}-\d{2}-\d{2}/);
-    if(found)days.add(found[0]);
-    else {
-      const person=H().find(s=>issue.startsWith(s.name+':'));
-      if(person){for(const d of dates)if(!SH(person,d)&&!paid(person,d))days.add(K(d));if(!dates.some(d=>!SH(person,d)&&!paid(person,d)))days.add('期間全体');}
-      else days.add('期間全体');
-    }
-  }
-  const result=days.size?`確認が必要な日付：\n${[...days].sort().join('・')}`:'ホールの自動生成をしました（条件検査済み）';
-  window.alert(result+(cloudError?'\n\nクラウド保存に失敗しました。端末には保存されています。通信を確認して管理画面から再保存してください。':''));
+  const messages=employeeOnlyWarnings();
+  window.alert((messages.length?messages.join('\n'):'ホールの自動生成をしました')+
+    (cloudError?'\n\nクラウド保存に失敗しました。端末には保存されています。通信を確認して管理画面から再保存してください。':''));
 };
 window.autoMake=window.vUnifiedHallAuto;window.v62AutoMake=window.autoMake;
 })();
