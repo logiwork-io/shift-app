@@ -10635,7 +10635,7 @@ function patterns(s,d,allowSoft=false){
     else{
       const longest=Math.min(b.max,c,st+MAXH(d));if(longest<=st)continue;
       if(EAR(s)){
-        if(st===9){const e=Math.min(longest,13);if(e>st)ends.push(e);}
+        if(st===9){for(const e of [13,16,17])if(e>st&&e<=longest)ends.push(e);if(longest>st)ends.push(longest);}
         else if(st===11){ends.push(longest);for(const e of[16,17])if(e>st&&e<=longest)ends.push(e);}
       }else{
         ends.push(longest);
@@ -10732,10 +10732,23 @@ function ensureOpening(){
   for(const d of dates){
     let open=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9&&SET(s));
     if(!open.length){const c=H().filter(s=>SET(s)&&!SH(s,d)&&dayAvailable(s,d)&&runIfAdd(s,d)<=Number(s.max||6)).map(s=>({s,p:patterns(s,d).find(p=>p[0]===9)})).filter(x=>x.p).sort((a,b)=>{
-      // 9時担当だけの優先順位。土日祝は最大3連勤、平日は最大6連勤を優先。
-      // 勤務可能・前月からの連勤は候補生成とrunIfAddで先に判定済み。
-      const priority=x=>HOL(d)?(Number(x.s.max||6)<=3?0:1):(Number(x.s.max||6)>=6?0:1);
-      return priority(a)-priority(b)||workDays(a.s)-workDays(b.s)||effRank(b.s)-effRank(a.s);
+      // 9時担当は13〜17時の不足を優先して判断。連勤上限は適格性判定にのみ使う。
+      const afternoonNeed=x=>{
+        const other=H().filter(y=>y.id!==x.s.id&&SH(y,d));
+        let deficit=0;
+        for(let h=13;h<17;h++){
+          const working=other.filter(y=>Number(SH(y,d).start)<=h&&Number(SH(y,d).end)>h).length;
+          // 既存の勤務と、まだ未配置の人が11〜17時を担当できる見込みを評価。
+          const potential=H().filter(y=>y.id!==x.s.id&&!SH(y,d)&&dayAvailable(y,d)&&runIfAdd(y,d)<=Number(y.max||6)
+            &&patterns(y,d).some(p=>p[0]>=11&&p[0]<=h&&p[1]>h)).length;
+          const available=Math.min(requiredHead(d,h),working+potential);
+          deficit+=Math.max(0,requiredHead(d,h)-available-(x.p[1]>h?1:0))*10;
+          // 休憩の余力: 最低必要人数ぴったりの時間は1人分の余裕を求める。
+          deficit+=Math.max(0,requiredHead(d,h)+1-available-(x.p[1]>h?1:0))*3;
+        }
+        return deficit;
+      };
+      return afternoonNeed(a)-afternoonNeed(b)||workDays(a.s)-workDays(b.s)||effRank(b.s)-effRank(a.s);
     });if(c.length)put(c[0].s,d,...c[0].p);open=H().filter(s=>SH(s,d)&&Number(SH(s,d).start)===9&&SET(s));}
     // 9時は最低1人。余分な9時入りは、開始固定でなければ11時へ移せる時だけ移す。削除はしない。
     if(open.length){
@@ -11554,59 +11567,48 @@ function generate(){
 // 既存勤務日の9時/11時を交換できる場合に限り実行し、勤務日・希望休・他職種は変更しない。
 function rebalanceNineOclockOnly(){
   const early=H().filter(s=>EAR(s)&&SET(s));
-  const short=early.filter(s=>Number(s.max||6)<=3);
-  const long=early.filter(s=>Number(s.max||6)>=6);
-  if(!short.length||!long.length)return;
-  const count=(s,special)=>dates.filter(d=>!!SH(s,d)&&Number(SH(s,d).start)===9&&HOL(d)===special).length;
-  const total=(s,special)=>dates.filter(d=>!!SH(s,d)&&HOL(d)===special).length;
   const daySnapshot=d=>JSON.parse(JSON.stringify(schedule[K(d)]||{}));
   const restore=(d,snap)=>{schedule[K(d)]=snap;activeHourCache.clear();workdayCache.clear();};
-  const coverage=d=>{
-    const a=[];for(let h=9;h<C(d);h++){
-      const xs=active(d,h);a.push({n:xs.length,dr:xs.some(DR),b:h>=17&&xs.some(PTB),rc:h>=20&&xs.some(RC),dc:h>=20&&xs.some(DC)});
-    }return a;
+  // 13〜17時の人数と休憩余力を優先。9時担当以外の勤務日や職種は変えない。
+  const afternoonScore=d=>{
+    let score=0;
+    for(let h=13;h<17;h++){
+      const n=active(d,h).length,req=requiredHead(d,h);
+      score+=Math.max(0,req-n)*100+Math.max(0,req+1-n)*20;
+    }
+    return score;
   };
-  function swap(d,from,to){
-    const a=SH(from,d),b=SH(to,d);
-    if(!a||!b||Number(a.start)!==9||Number(b.start)===9)return false;
-    if(!dayAvailable(from,d)||!dayAvailable(to,d))return false;
-    if(fixedStart(from,d)!=null||fixedStart(to,d)!=null)return false;
-    if(requested(from,d)||requested(to,d))return false;
-    const toNine=patterns(to,d).filter(p=>p[0]===9);
-    const fromLater=patterns(from,d).filter(p=>p[0]===11);
-    if(!toNine.length||!fromLater.length)return false;
-    const before=coverage(d),old=daySnapshot(d);
-    const originalHours=Number(a.end)-9+Number(b.end)-Number(b.start);
-    for(const q of toNine){for(const p of fromLater){
-      if(p[1]-p[0]+q[1]-q[0]<originalHours-1)continue;
-      del(from,d);del(to,d);
-      if(put(to,d,...q)&&put(from,d,...p)){
-        const after=coverage(d);
-        const safe=after.every((x,i)=>{
-          const y=before[i],h=i+9;
-          return x.n>=Math.min(y.n,requiredHead(d,h))&&(!y.dr||x.dr)&&(!y.b||x.b)&&(!y.rc||x.rc)&&(!y.dc||x.dc);
+  for(const d of dates){
+    const opener=early.find(s=>SH(s,d)?.start===9);
+    if(!opener||fixedStart(opener,d)!=null||requested(opener,d))continue;
+    const original=afternoonScore(d);
+    const alternatives=early.filter(s=>s.id!==opener.id&&SH(s,d)&&SH(s,d).start!==9
+      &&fixedStart(s,d)==null&&!requested(s,d));
+    let best=null;
+    for(const other of alternatives){
+      const old=daySnapshot(d),before=H().map(s=>({s,sh:SH(s,d)}));
+      const beforeCoverage=Array.from({length:C(d)-9},(_,i)=>{
+        const h=i+9,people=active(d,h);
+        return {n:people.length,dr:people.some(DR),b:h>=17&&people.some(PTB),rc:h>=20&&people.some(RC),dc:h>=20&&people.some(DC)};
+      });
+      const nine=patterns(other,d).filter(p=>p[0]===9);
+      const later=patterns(opener,d).filter(p=>p[0]===11);
+      for(const q of nine)for(const p of later){
+        restore(d,old);del(opener,d);del(other,d);
+        if(!put(other,d,...q)||!put(opener,d,...p))continue;
+        const score=afternoonScore(d);
+        if(score>=original)continue;
+        const safe=beforeCoverage.every((v,i)=>{
+          const h=i+9,people=active(d,h);
+          return people.length>=Math.min(v.n,requiredHead(d,h))&&(!v.dr||people.some(DR))
+            &&(!v.b||people.some(PTB))&&(!v.rc||people.some(RC))&&(!v.dc||people.some(DC));
         });
-        if(safe&&maxRun(from)<=Number(from.max||6)&&maxRun(to)<=Number(to.max||6))return true;
+        if(safe&&maxRun(opener)<=Number(opener.max||6)&&maxRun(other)<=Number(other.max||6)
+          &&(!best||score<best.score))best={other,q,p,score};
       }
       restore(d,old);
-    }}
-    return false;
-  }
-  // 土日祝は短期連勤者を優先。両者がすでに勤務する日だけ入れ替える。
-  for(const d of dates.filter(HOL)){
-    const opener=early.find(s=>SH(s,d)?.start===9);
-    if(!opener||!long.some(s=>s.id===opener.id))continue;
-    const options=short.filter(s=>SH(s,d)&&Number(SH(s,d).start)!==9)
-      .sort((a,b)=>count(a,true)-count(b,true));
-    for(const s of options)if(swap(d,opener,s))break;
-  }
-  // 平日は長期連勤者へ。土日祝の配置を壊さず、勤務済みの人同士だけ交換。
-  for(const d of dates.filter(d=>!HOL(d))){
-    const opener=early.find(s=>SH(s,d)?.start===9);
-    if(!opener||!short.some(s=>s.id===opener.id))continue;
-    const options=long.filter(s=>SH(s,d)&&Number(SH(s,d).start)!==9)
-      .sort((a,b)=>count(a,false)-count(b,false));
-    for(const s of options)if(swap(d,opener,s))break;
+    }
+    if(best){del(opener,d);del(best.other,d);put(best.other,d,...best.q);put(opener,d,...best.p);}
   }
 }
 // 土日祝・祝前日: 出勤可能者を休みにする前に、既存者の時間調整を試す。
